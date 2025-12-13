@@ -1,7 +1,7 @@
 {
-  "name": "bunny-io",
+  "name": "bunny-island-io",
   "version": "1.0.0",
-  "description": "Bunny IO Game",
+  "description": "Bunny Island Online Game",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -11,6 +11,6 @@
     "socket.io": "^4.7.2"
   },
   "engines": {
-    "node": ">=16.x"
+    "node": ">=14.x"
   }
 }
