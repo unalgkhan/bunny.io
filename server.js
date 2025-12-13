@@ -12,32 +12,25 @@ app.get('/', (req, res) => {
 
 // --- OYUN AYARLARI ---
 const WORLD_SIZE = 320;
-const MAX_ITEMS = 150;
-const SPEED = 0.3;
+const MAX_ITEMS = 120; // Eşya sayısı
 
-// Oyun Durumu
 let players = {};
 let projectiles = [];
 let traps = [];
 let items = [];
-let teleporters = [
-    {x: -80, z: -80, tx: 80, tz: 80},
-    {x: 80, z: 80, tx: -80, tz: -80}
-];
 
-// Eşya Üretici (Power-up Dahil)
+// Rastgele Eşya Üretici
 function spawnItem() {
     const angle = Math.random() * Math.PI * 2;
     const r = Math.random() * (WORLD_SIZE / 2 - 10);
+    // Eşya olasılıkları: %60 Havuç, %10 Altın, %10 Biber, %10 Mıknatıs, %10 Mantar
     const rand = Math.random();
     let type = 'carrot';
+    if (rand > 0.60) type = 'gold'; 
+    if (rand > 0.70) type = 'pepper';
+    if (rand > 0.80) type = 'magnet';
+    if (rand > 0.90) type = 'mushroom';
     
-    // %20 ihtimalle özel eşya
-    if(rand < 0.05) type = 'gold';      // Ölümsüzlük
-    else if(rand < 0.10) type = 'pepper'; // Hız
-    else if(rand < 0.15) type = 'magnet'; // Mıknatıs
-    else if(rand < 0.20) type = 'mushroom'; // Tuzak/Zehir
-
     return {
         id: Math.random().toString(36).substr(2, 9),
         x: Math.cos(angle) * r,
@@ -46,24 +39,20 @@ function spawnItem() {
     };
 }
 
-// Başlangıç Eşyaları
 for (let i = 0; i < MAX_ITEMS; i++) items.push(spawnItem());
 
 io.on('connection', (socket) => {
-    console.log('Oyuncu geldi:', socket.id);
-
     socket.on('joinGame', (data) => {
         players[socket.id] = {
             id: socket.id,
-            x: (Math.random()-0.5)*100, z: (Math.random()-0.5)*100,
+            x: (Math.random()-0.5)*50, z: (Math.random()-0.5)*50,
             angle: 0,
-            color: Math.random()*0xffffff,
-            name: data.name || "Player",
+            color: Math.random() * 0xffffff,
+            name: data.name || "Oyuncu",
             hat: data.hat || 0,
             score: 20,
             input: { active: false, angle: 0, run: false },
-            effects: { speed: false, magnet: false, ghost: false, confused: false },
-            warpCooldown: 0
+            effects: { ghost: false, speed: false, magnet: false, confused: false }
         };
         socket.emit('initGame', { id: socket.id });
     });
@@ -81,8 +70,7 @@ io.on('connection', (socket) => {
             x: p.x + Math.sin(p.angle)*2, z: p.z + Math.cos(p.angle)*2,
             vx: Math.sin(p.angle)*1.2, vz: Math.cos(p.angle)*1.2, life: 60
         });
-        // Sesi herkese duyur
-        io.emit('sound', {type: 'pop', x: p.x, z: p.z});
+        io.emit('sound', 'shoot'); // Ses efekti sinyali
     });
 
     socket.on('trap', () => {
@@ -90,140 +78,120 @@ io.on('connection', (socket) => {
         if (!p || p.score < 20) return;
         p.score -= 10;
         traps.push({ id: Math.random().toString(36).substr(2,9), ownerId: p.id, x: p.x, z: p.z, life: 1000 });
-        io.emit('sound', {type: 'bad', x: p.x, z: p.z});
     });
 
     socket.on('disconnect', () => { delete players[socket.id]; });
 });
 
-// --- OYUN DÖNGÜSÜ (60 FPS) ---
+// OYUN DÖNGÜSÜ (60 FPS)
 setInterval(() => {
-    const now = Date.now();
-
     for (const id in players) {
         const p = players[id];
         
-        // Hız Hesapla
-        let currentSpeed = SPEED;
-        if (p.effects.speed) currentSpeed *= 1.8; // Biber yemişse
-        if (p.effects.confused) currentSpeed *= 0.5; // Mantar yemişse
-        if (p.input.run && p.score > 5) {
-            currentSpeed *= 2.0;
-            p.score -= 0.05;
-        }
+        // HIZ VE EFEKT HESABI
+        let speed = 0.3;
+        
+        if (p.input.run && p.score > 5) { speed *= 2.0; p.score -= 0.05; }
+        if (p.effects.speed) speed *= 1.8; // Biber etkisi
+        if (p.effects.confused) speed *= 0.6; // Mantar etkisi (Yavaşlatır)
 
-        // Hareket
         if (p.input.active) {
             let moveAngle = p.input.angle;
-            if(p.effects.confused) moveAngle += Math.PI; // Ters yön
+            if(p.effects.confused) moveAngle += Math.PI; // Mantar kafası (Ters yön)
 
-            p.angle = p.input.angle; // Görsel açı
-            p.x += Math.sin(moveAngle) * currentSpeed;
-            p.z += Math.cos(moveAngle) * currentSpeed;
-
-            // Sınırlar
-            const limit = WORLD_SIZE/2;
-            if(Math.abs(p.x) > limit) p.x = Math.sign(p.x)*limit;
-            if(Math.abs(p.z) > limit) p.z = Math.sign(p.z)*limit;
+            p.angle = p.input.angle; // Görsel açı değişmez
+            p.x += Math.sin(moveAngle) * speed;
+            p.z += Math.cos(moveAngle) * speed;
+            
+            // Harita Sınırı
+            if(Math.abs(p.x) > WORLD_SIZE/2) p.x = Math.sign(p.x) * WORLD_SIZE/2;
+            if(Math.abs(p.z) > WORLD_SIZE/2) p.z = Math.sign(p.z) * WORLD_SIZE/2;
         }
 
-        // Işınlanma (Teleport)
-        if(now > p.warpCooldown) {
-            teleporters.forEach(tp => {
-                if(Math.hypot(p.x - tp.x, p.z - tp.z) < 5) {
-                    p.x = tp.tx; p.z = tp.tz;
-                    p.warpCooldown = now + 3000;
-                    io.emit('effect', {type: 'warp', x: p.x, z: p.z}); // Görsel efekt gönder
-                    io.emit('sound', {type: 'warp', x: p.x, z: p.z});
-                }
-            });
-        }
-
-        // Eşya Toplama
+        // EŞYA TOPLAMA (Mıknatıs Mantığı Dahil)
         for (let i = items.length - 1; i >= 0; i--) {
-            const item = items[i];
-            let pickupRange = 1 + (p.score * 0.01) + 1;
-            if(p.effects.magnet && item.type === 'carrot') pickupRange += 8; // Mıknatıs etkisi
+            const it = items[i];
+            
+            // Eğer mıknatıs varsa çekim alanı 3 katına çıkar
+            let pickupRange = 2 + (p.score * 0.01);
+            if(p.effects.magnet && it.type === 'carrot') pickupRange = 10; 
 
-            if (Math.hypot(p.x - item.x, p.z - item.z) < pickupRange) {
-                // Efektleri Uygula
-                if(item.type === 'carrot') {
-                    p.score += 2;
-                } else if(item.type === 'pepper') {
-                    p.effects.speed = true; setTimeout(()=>p.effects.speed=false, 5000);
-                    io.emit('msg', {id: p.id, text: "🌶️ HIZ!", color: "red"});
-                } else if(item.type === 'gold') {
-                    p.effects.ghost = true; setTimeout(()=>p.effects.ghost=false, 5000);
-                    io.emit('msg', {id: p.id, text: "👻 GÖRÜNMEZ!", color: "gold"});
-                } else if(item.type === 'magnet') {
-                    p.effects.magnet = true; setTimeout(()=>p.effects.magnet=false, 5000);
-                    io.emit('msg', {id: p.id, text: "🧲 MIKNATIS!", color: "blue"});
-                } else if(item.type === 'mushroom') {
-                    p.effects.confused = true; setTimeout(()=>p.effects.confused=false, 5000);
-                    io.emit('msg', {id: p.id, text: "🍄 KAFAM GÜZEL!", color: "purple"});
+            // Mesafe kontrolü
+            let dist = Math.hypot(p.x - it.x, p.z - it.z);
+
+            // Mıknatıs çekim efekti (Eşyayı oyuncuya yaklaştır)
+            if(p.effects.magnet && it.type === 'carrot' && dist < 10) {
+                it.x += (p.x - it.x) * 0.1;
+                it.z += (p.z - it.z) * 0.1;
+            }
+
+            if (dist < pickupRange) {
+                // Eşya Özellikleri
+                if(it.type === 'carrot') p.score += 2;
+                else if(it.type === 'gold') { 
+                    p.effects.ghost = true; setTimeout(()=>p.effects.ghost=false, 5000); 
                 }
-
+                else if(it.type === 'pepper') { 
+                    p.effects.speed = true; setTimeout(()=>p.effects.speed=false, 5000); 
+                }
+                else if(it.type === 'magnet') { 
+                    p.effects.magnet = true; setTimeout(()=>p.effects.magnet=false, 8000); 
+                }
+                else if(it.type === 'mushroom') { 
+                    p.effects.confused = true; setTimeout(()=>p.effects.confused=false, 5000); 
+                }
+                
                 items.splice(i, 1);
                 items.push(spawnItem());
-                io.emit('sound', {type: 'eat', x: p.x, z: p.z});
             }
         }
     }
 
-    // Mermiler
+    // MERMİLER
     for (let i = projectiles.length - 1; i >= 0; i--) {
-        const proj = projectiles[i];
-        proj.x += proj.vx; proj.z += proj.vz; proj.life--;
+        const pr = projectiles[i];
+        pr.x += pr.vx; pr.z += pr.vz; pr.life--;
         let hit = false;
-        
-        for (const pid in players) {
-            if (pid === proj.ownerId) continue;
+        for(let pid in players) {
+            if(pid === pr.ownerId) continue;
             const t = players[pid];
-            if(t.effects.ghost) continue; // Hayaletlere işlemez
+            if(t.effects.ghost) continue; // Hayaletse vurulmaz!
 
-            if (Math.hypot(proj.x - t.x, proj.z - t.z) < 1 + (t.score * 0.01)) {
+            if(Math.hypot(pr.x - t.x, pr.z - t.z) < 1 + (t.score * 0.01)) {
                 t.score = Math.max(10, t.score - 10);
-                if(players[proj.ownerId]) players[proj.ownerId].score += 5;
-                hit = true;
-                io.emit('sound', {type: 'bad', x: t.x, z: t.z});
-                io.emit('msg', {id: t.id, text: "VURULDUN!", color: "red"});
-                break;
+                hit = true; break;
             }
         }
-        if (proj.life <= 0 || hit) projectiles.splice(i, 1);
+        if (pr.life <= 0 || hit) projectiles.splice(i, 1);
     }
 
-    // Tuzaklar
+    // TUZAKLAR
     for (let i = traps.length - 1; i >= 0; i--) {
-        const t = traps[i];
-        t.life--;
-        let triggered = false;
-        for (const pid in players) {
-            if (pid === t.ownerId) continue;
-            const pl = players[pid];
-            if(pl.effects.ghost) continue;
+        const tr = traps[i]; tr.life--;
+        let hit = false;
+        for(let pid in players) {
+            if(pid === tr.ownerId) continue;
+            const t = players[pid];
+            if(t.effects.ghost) continue;
 
-            if (Math.hypot(t.x - pl.x, t.z - pl.z) < 2) {
-                pl.score = Math.max(10, pl.score / 2); // YARI YARIYA!
-                triggered = true;
-                io.emit('sound', {type: 'bad', x: pl.x, z: pl.z});
-                io.emit('msg', {id: pl.id, text: "TUZAĞA BASTIN!", color: "purple"});
+            if(Math.hypot(tr.x - t.x, tr.z - t.z) < 2) {
+                t.score /= 2; // Yarı yarıya küçült
+                hit = true;
             }
         }
-        if (t.life <= 0 || triggered) traps.splice(i, 1);
+        if (tr.life <= 0 || hit) traps.splice(i, 1);
     }
 
-    // Veri Paketi
-    const packet = {
+    io.emit('state', {
         players: Object.values(players).map(p => ({
             id: p.id, x: p.x, z: p.z, angle: p.angle, score: p.score, 
-            hat: p.hat, color: p.color, name: p.name, effects: p.effects
+            hat: p.hat, color: p.color, name: p.name, 
+            isMoving: p.input.active, effects: p.effects
         })),
-        projectiles, traps, items
-    };
+        items, projectiles, traps
+    });
 
-    io.emit('state', packet);
 }, 1000 / 60);
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log(`Ultimate Server running on ${PORT}`));
+http.listen(PORT, () => console.log('Server Ready!'));
