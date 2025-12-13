@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bunny Island IO</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Nunito', sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;900&display=swap');
+
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
+        
+        /* HUD (İsimler) */
+        .hud-label { position: absolute; background: rgba(0,0,0,0.5); color: white; padding: 4px 8px; border-radius: 8px; font-weight: bold; transform: translate(-50%, -100%); pointer-events: none; font-size: 14px; white-space: nowrap; }
+        
+        /* KONTROLLER */
+        #joystick-area { position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.2); border-radius: 50%; pointer-events: auto; border: 2px solid rgba(255,255,255,0.5); }
+        #joystick-thumb { width: 50px; height: 50px; background: #fff; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        
+        .btn-action { position: absolute; width: 65px; height: 65px; border-radius: 50%; border: 3px solid white; color: white; display: flex; justify-content: center; align-items: center; font-size: 1.5rem; pointer-events: auto; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        #btn-run { bottom: 40px; right: 40px; width: 90px; height: 90px; background: linear-gradient(135deg, #00c6fb, #005bea); font-weight: 900; font-size: 1.2rem; }
+        #btn-shoot { bottom: 150px; right: 30px; background: #ff6b6b; }
+        #btn-trap { bottom: 30px; right: 150px; background: #8e44ad; }
+        
+        /* MENÜ */
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #4facfe, #00f2fe); display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: auto; z-index: 99; }
+        input { padding: 15px; border-radius: 15px; border: none; text-align: center; margin: 10px; width: 200px; font-size: 1.2rem; font-family: 'Nunito'; }
+        button.play-btn { background: #FFA502; color: white; padding: 15px 40px; border: none; border-radius: 20px; font-size: 1.5rem; font-weight: 900; cursor: pointer; box-shadow: 0 10px 20px rgba(0,0,0,0.2); margin-top: 20px; }
+        
+        .hat-selector { display: flex; gap: 10px; margin: 20px; }
+        .hat-item { width: 50px; height: 50px; background: rgba(255,255,255,0.3); border-radius: 10px; cursor: pointer; border: 2px solid transparent; display: flex; justify-content: center; align-items: center; font-size: 1.5rem; }
+        .hat-item.selected { border-color: #FFA502; background: white; }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div id="joystick-area"><div id="joystick-thumb"></div></div>
+        <div id="btn-run" class="btn-action">KOŞ</div>
+        <div id="btn-shoot" class="btn-action">🚀</div>
+        <div id="btn-trap" class="btn-action">🍄</div>
+    </div>
+
+    <div id="menu" class="overlay">
+        <h1 style="color:white; font-size:3rem; margin:0;">BUNNY IO</h1>
+        <p style="color:white;">Online Savaş</p>
+        
+        <input type="text" id="pName" placeholder="İsminiz" maxlength="10" value="Oyuncu">
+        
+        <div class="hat-selector" id="hats">
+            <div class="hat-item selected" onclick="selectHat(0)">❌</div>
+            <div class="hat-item" onclick="selectHat(1)">🎪</div>
+            <div class="hat-item" onclick="selectHat(2)">🎩</div>
+            <div class="hat-item" onclick="selectHat(3)">🪖</div>
+        </div>
+
+        <button class="play-btn" onclick="Game.connect()">BAĞLAN</button>
+    </div>
+
+    <script>
+        let selectedHat = 0;
+        function selectHat(id) {
+            selectedHat = id;
+            document.querySelectorAll('.hat-item').forEach((el, i) => {
+                el.classList.toggle('selected', i === id);
+            });
+        }
+
+        const Game = {
+            socket: null,
+            scene: null, camera: null, renderer: null,
+            players: {}, items: {}, projectiles: [], traps: [],
+            myId: null,
+            input: { angle: 0, active: false, run: false },
+            
+            connect: function() {
+                const name = document.getElementById('pName').value;
+                this.socket = io();
+                
+                this.socket.on('connect', () => {
+                    // Bağlanınca giriş yap
+                    this.socket.emit('joinGame', { name: name, hat: selectedHat });
+                });
+
+                this.socket.on('initGame', (data) => {
+                    this.myId = data.id;
+                    document.getElementById('menu').style.display = 'none';
+                    document.getElementById('ui-layer').style.display = 'block';
+                    this.init3D();
+                    this.setupEvents();
+                });
+            },
+
+            init3D: function() {
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x87CEEB);
+                this.camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 1, 1000);
+                this.camera.position.set(0, 50, 60);
+
+                this.renderer = new THREE.WebGLRenderer({antialias: true});
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                document.body.appendChild(this.renderer.domElement);
+
+                // Ortam
+                const hemi = new THREE.HemisphereLight(0xffffff, 0xffeeb1, 0.8);
+                this.scene.add(hemi);
+                const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+                dir.position.set(50, 100, 50); dir.castShadow = true;
+                this.scene.add(dir);
+
+                // Zemin ve Deniz
+                const ground = new THREE.Mesh(new THREE.CylinderGeometry(160, 160, 5, 64), new THREE.MeshStandardMaterial({color: 0xa8e063}));
+                ground.position.y = -2.5; ground.receiveShadow = true;
+                this.scene.add(ground);
+                const sea = new THREE.Mesh(new THREE.CircleGeometry(500, 32), new THREE.MeshBasicMaterial({color: 0x4fc3f7}));
+                sea.rotation.x = -Math.PI/2; sea.position.y = -5;
+                this.scene.add(sea);
+                
+                // Materyaller
+                this.matRed = new THREE.MeshStandardMaterial({color: 0xff4757});
+                this.matPurple = new THREE.MeshStandardMaterial({color: 0x8e44ad});
+                this.matCarrot = new THREE.MeshStandardMaterial({color: 0xff9f43});
+
+                this.animate();
+            },
+
+            setupEvents: function() {
+                // Sunucudan Düzenli Güncelleme (60 FPS)
+                this.socket.on('state', (data) => {
+                    this.syncPlayers(data.players);
+                    this.syncProjectiles(data.projectiles);
+                    this.syncTraps(data.traps);
+                    this.syncItems(data.carrots);
+                });
+            },
+
+            syncPlayers: function(serverPlayers) {
+                const serverIds = new Set();
+                
+                serverPlayers.forEach(pData => {
+                    serverIds.add(pData.id);
+                    
+                    if (!this.players[pData.id]) {
+                        this.createPlayerMesh(pData);
+                    }
+                    
+                    const p = this.players[pData.id];
+                    // Pozisyonu yumuşat (Lerp)
+                    p.mesh.position.lerp(new THREE.Vector3(pData.x, 0, pData.z), 0.3);
+                    p.mesh.rotation.y = pData.angle;
+                    
+                    // Skor bazlı büyüme
+                    const targetScale = 1 + (pData.score * 0.01);
+                    p.mesh.scale.setScalar(targetScale);
+
+                    // HUD Güncelle
+                    this.updateHud(p.hud, p.mesh.position, targetScale);
+
+                    // Kamera Takibi (Eğer bensem)
+                    if (pData.id === this.myId) {
+                        const targetY = 40 + (targetScale * 10);
+                        const targetZ = 50 + (targetScale * 10);
+                        this.camera.position.lerp(new THREE.Vector3(pData.x, targetY, pData.z + targetZ), 0.1);
+                        this.camera.lookAt(pData.x, 0, pData.z);
+                    }
+                });
+
+                // Ayrılan oyuncuları sil
+                for (let id in this.players) {
+                    if (!serverIds.has(id)) {
+                        this.scene.remove(this.players[id].mesh);
+                        this.players[id].hud.remove();
+                        delete this.players[id];
+                    }
+                }
+            },
+
+            createPlayerMesh: function(data) {
+                const mesh = new THREE.Group();
+                const body = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({color: data.color}));
+                body.position.y = 1; body.castShadow = true;
+                
+                const earGeo = new THREE.CapsuleGeometry(0.2, 0.8, 4, 8);
+                const earL = new THREE.Mesh(earGeo, new THREE.MeshStandardMaterial({color: data.color}));
+                earL.position.set(-0.3, 1.8, 0); earL.rotation.z = 0.3;
+                const earR = new THREE.Mesh(earGeo, new THREE.MeshStandardMaterial({color: data.color}));
+                earR.position.set(0.3, 1.8, 0); earR.rotation.z = -0.3;
+                
+                mesh.add(body); mesh.add(earL); mesh.add(earR);
+                
+                // Şapka Ekleme
+                if(data.hat > 0) this.addHat(mesh, data.hat);
+
+                this.scene.add(mesh);
+                
+                const hud = document.createElement('div');
+                hud.className = 'hud-label';
+                hud.innerText = data.name;
+                document.body.appendChild(hud);
+
+                this.players[data.id] = { mesh: mesh, hud: hud };
+            },
+
+            addHat: function(mesh, id) {
+                let hat;
+                if(id === 1) hat = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.8, 16), new THREE.MeshStandardMaterial({color:0xff4757}));
+                if(id === 2) hat = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.6, 16), new THREE.MeshStandardMaterial({color:0x333333}));
+                if(id === 3) hat = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16, 0, 6.3, 0, 1.5), new THREE.MeshStandardMaterial({color:0xbdc3c7}));
+                if(hat) { hat.position.y = 2.2; mesh.add(hat); }
+            },
+
+            syncItems: function(serverItems) {
+                // Basit bir yeniden oluşturma mantığı (Optimize edilebilir)
+                // Mevcutları temizle
+                for(let id in this.items) { this.scene.remove(this.items[id]); }
+                this.items = {};
+                
+                serverItems.forEach(item => {
+                    const m = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.5, 8), this.matCarrot);
+                    m.position.set(item.x, 0.75, item.z);
+                    m.rotation.x = Math.PI;
+                    this.scene.add(m);
+                    this.items[item.id] = m;
+                });
+            },
+
+            syncProjectiles: function(serverProjs) {
+                // Temizle ve tekrar çiz
+                this.projectiles.forEach(p => this.scene.remove(p));
+                this.projectiles = [];
+                
+                serverProjs.forEach(p => {
+                    const m = new THREE.Mesh(new THREE.ConeGeometry(0.3, 1, 8), this.matRed);
+                    m.rotation.x = Math.PI/2;
+                    m.position.set(p.x, 1, p.z);
+                    m.lookAt(p.x + p.vx, 1, p.z + p.vz);
+                    this.scene.add(m);
+                    this.projectiles.push(m);
+                });
+            },
+
+            syncTraps: function(serverTraps) {
+                this.traps.forEach(t => this.scene.remove(t));
+                this.traps = [];
+                serverTraps.forEach(t => {
+                    const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.8), this.matPurple);
+                    m.position.set(t.x, 1, t.z);
+                    this.scene.add(m);
+                    this.traps.push(m);
+                });
+            },
+
+            updateHud: function(div, pos3d, scale) {
+                const pos = pos3d.clone();
+                pos.y += 2.5 + (scale * 0.8);
+                pos.project(this.camera);
+                if (Math.abs(pos.z) > 1) { div.style.display = 'none'; return; }
+                const x = (pos.x * .5 + .5) * window.innerWidth;
+                const y = (-(pos.y * .5) + .5) * window.innerHeight;
+                div.style.display = 'block'; div.style.left = x + 'px'; div.style.top = y + 'px';
+            },
+
+            animate: function() {
+                requestAnimationFrame(() => this.animate());
+                if (this.socket && this.myId) {
+                    this.socket.emit('input', this.input);
+                }
+                this.renderer.render(this.scene, this.camera);
+            }
+        };
+
+        // --- INPUT HANDLING ---
+        const joy = document.getElementById('joystick-area');
+        const thumb = document.getElementById('joystick-thumb');
+        
+        const handleJoy = (cx, cy, x, y) => {
+            const dx = x - cx, dy = y - cy;
+            const dist = Math.min(Math.hypot(dx, dy), 40);
+            const ang = Math.atan2(dy, dx);
+            Game.input.active = true;
+            Game.input.angle = Math.atan2(dx, dy); // Three.js koordinatına çevir
+            thumb.style.transform = `translate(calc(-50% + ${Math.cos(ang)*dist}px), calc(-50% + ${Math.sin(ang)*dist}px))`;
+        };
+        
+        joy.addEventListener('touchmove', e => { e.preventDefault(); const r = joy.getBoundingClientRect(); handleJoy(r.left+r.width/2, r.top+r.height/2, e.touches[0].clientX, e.touches[0].clientY); });
+        joy.addEventListener('touchend', () => { Game.input.active = false; thumb.style.transform = `translate(-50%, -50%)`; });
+        joy.addEventListener('mousedown', e => { 
+            const r = joy.getBoundingClientRect(); 
+            const move = (em) => handleJoy(r.left+r.width/2, r.top+r.height/2, em.clientX, em.clientY);
+            window.addEventListener('mousemove', move);
+            window.addEventListener('mouseup', () => { window.removeEventListener('mousemove', move); Game.input.active = false; thumb.style.transform = `translate(-50%, -50%)`; });
+        });
+
+        // Butonlar
+        const btnRun = document.getElementById('btn-run');
+        const btnShoot = document.getElementById('btn-shoot');
+        const btnTrap = document.getElementById('btn-trap');
+
+        // Mobilde çoklu dokunma desteği için eventler
+        const bindBtn = (el, startFn, endFn) => {
+            el.addEventListener('touchstart', e => { e.preventDefault(); startFn(); });
+            if(endFn) el.addEventListener('touchend', e => { e.preventDefault(); endFn(); });
+            el.addEventListener('mousedown', startFn);
+            if(endFn) el.addEventListener('mouseup', endFn);
+        };
+
+        bindBtn(btnRun, () => Game.input.run = true, () => Game.input.run = false);
+        bindBtn(btnShoot, () => Game.socket.emit('shoot'));
+        bindBtn(btnTrap, () => Game.socket.emit('trap'));
+
+        window.addEventListener('resize', () => {
+            Game.camera.aspect = window.innerWidth/window.innerHeight;
+            Game.camera.updateProjectionMatrix();
+            Game.renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
