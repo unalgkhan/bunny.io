@@ -4,7 +4,14 @@ const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const path = require('path');
 
-app.use(express.static(path.join(__dirname, 'public')));
+// --- DEĞİŞİKLİK BURADA ---
+// Artık 'public' klasörü aramıyor, direkt olduğu yere bakıyor.
+app.use(express.static(__dirname));
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+// -------------------------
 
 const WORLD_SIZE = 320;
 const MAX_CARROTS = 100;
