@@ -5,14 +5,14 @@ const server = http.createServer(app);
 const { Server } = require("socket.io");
 const io = new Server(server);
 
-// Dosyaları aynı klasörden sun (GitHub/Render yapına uygun)
+// Dosyaları sun
 app.use(express.static(__dirname));
 
 // OYUN DURUMU
 let players = {};
-let items = []; // Havuçlar sunucuda tutulacak
+let items = []; 
 const WORLD_SIZE = 800;
-const ITEM_COUNT = 300; // Toplam eşya sayısı
+const ITEM_COUNT = 300; 
 
 // Sunucu başladığında havuçları yarat
 function spawnItems() {
@@ -52,13 +52,13 @@ io.on('connection', (socket) => {
             color: data.color || Math.random() * 0xffffff,
             hat: data.hat || 0,
             score: 10,
-            isMoving: false // Animasyon için eklendi
+            isMoving: false 
         };
 
-        // Yeni oyuncuya mevcut durumu gönder
+        // Yeni oyuncuya: Mevcut oyuncuları ve mevcut eşyaları gönder
         socket.emit('initGame', { players: players, items: items, myId: socket.id });
         
-        // Diğerlerine yeni oyuncuyu haber ver
+        // Diğerlerine: Yeni oyuncuyu haber ver
         socket.broadcast.emit('newPlayer', players[socket.id]);
     });
 
@@ -68,32 +68,44 @@ io.on('connection', (socket) => {
             players[socket.id].x = data.x;
             players[socket.id].z = data.z;
             players[socket.id].angle = data.angle;
-            players[socket.id].isMoving = data.isMoving; // Hareket ediyor mu?
+            players[socket.id].isMoving = data.isMoving; // Hareket bilgisi
+            players[socket.id].score = data.score;      // Skor senkronizasyonu
         }
     });
 
-    // 3. EŞYA YEME (İSTEMCİDEN GELEN TALEP)
+    // 3. ATEŞ ETME (YENİ EKLENDİ)
+    socket.on('playerShoot', (data) => {
+        // Atan kişi hariç herkese haber ver
+        socket.broadcast.emit('remoteShoot', {
+            id: socket.id,
+            x: data.x,
+            z: data.z,
+            angle: data.angle
+        });
+    });
+
+    // 4. EŞYA YEME
     socket.on('requestEatItem', (itemId) => {
         const itemIndex = items.findIndex(i => i.id === itemId);
         if (itemIndex !== -1) {
             const item = items[itemIndex];
-            items.splice(itemIndex, 1); // Sunucudan sil
+            items.splice(itemIndex, 1); 
             
-            // Oyuncuya puan ver
+            // Oyuncuya sunucu tarafında da puan ekleyebiliriz (güvenlik için)
             if(players[socket.id]) {
                 players[socket.id].score += (item.type === 'carrot' ? 5 : 0);
             }
 
-            // Herkese haber ver (Silsinler ve ses çalsınlar)
+            // Herkese haber ver: "Bu ID'li eşyayı silin"
             io.emit('itemRemoved', { itemId: itemId, eaterId: socket.id, type: item.type });
 
-            // Eksilen eşya yerine yenisini koy (sonsuz döngü için)
+            // Yenisini doğur
             setTimeout(() => {
                 const angle = Math.random() * Math.PI * 2;
                 const radius = Math.random() * (WORLD_SIZE / 2 - 10);
                 const newItem = {
-                    id: Math.floor(Math.random() * 999999), // Rastgele ID
-                    type: 'carrot', // Genelde havuç doğsun
+                    id: Math.floor(Math.random() * 999999999), 
+                    type: 'carrot', 
                     x: Math.cos(angle) * radius,
                     z: Math.sin(angle) * radius
                 };
@@ -103,23 +115,20 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 4. OYUNCU YEME (KILL)
+    // 5. OYUNCU YEME (KILL)
     socket.on('killPlayer', (victimId) => {
         const killer = players[socket.id];
         const victim = players[victimId];
 
         if (killer && victim) {
-            // Basit hile koruması: Puan farkı kontrolü
-            // (Burayı daha sonra mesafe kontrolü ile güçlendirebiliriz)
             killer.score += victim.score * 0.5;
 
-            // Ölene "Öldün" mesajı at
+            // Ölene özel mesaj
             io.to(victimId).emit('youDied', { killerName: killer.name, score: victim.score });
             
-            // Herkese "Bu oyuncu silindi" mesajı at
+            // Herkese "Bu oyuncu öldü, silin" mesajı
             io.emit('playerKilled', { victimId: victimId, killerId: socket.id });
 
-            // Sunucudan kaydı sil
             delete players[victimId];
         }
     });
@@ -139,7 +148,6 @@ io.on('connection', (socket) => {
     });
 });
 
-// 30 FPS Güncelleme Döngüsü
 setInterval(() => {
     io.emit('stateUpdate', players);
 }, 1000 / 30);
@@ -148,4 +156,3 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Sunucu aktif: ${PORT}`);
 });
-
