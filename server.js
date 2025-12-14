@@ -6,7 +6,7 @@ const { Server } = require("socket.io");
 const io = new Server(server);
 
 // Dosyaları aynı klasörden sun (GitHub/Render yapına uygun)
-app.use(express.static(__dirname + '/public'));
+app.use(express.static(__dirname));
 
 // OYUN DURUMU
 let players = {};
@@ -148,3 +148,4 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Sunucu aktif: ${PORT}`);
 });
+
