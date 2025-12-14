@@ -141,7 +141,7 @@
     </div>
 
     <script>
-        /* --- DİL SİSTEMİ --- */
+        /* --- DİL SİSTEMİ (AYNI) --- */
         const LANG = {
             tr: { play: "OYNA", online: "ONLINE", market: "MARKET", subtitle: "Savaş • Hayatta Kal • Ye", legends: "OYUNCULAR", gameover: "OYUN BİTTİ", earned: "Kazanılan:", retry: "TEKRAR", hat_none: "Şapka Yok", hat_party: "Parti Şapkası", hat_top: "Silindir Şapka", hat_viking: "Viking Miğferi", equip: "KUŞAN", buy: "SATIN AL", equipped: "TAKILI", paused: "DURAKLATILDI", resume: "DEVAM ET", quit: "ÇIKIŞ" },
             en: { play: "PLAY ONLINE", online: "ONLINE", market: "MARKET", subtitle: "Fight • Survive • Eat", legends: "PLAYERS", gameover: "GAME OVER", earned: "Earned:", retry: "RETRY", hat_none: "No Hat", hat_party: "Party Hat", hat_top: "Top Hat", hat_viking: "Viking Helmet", equip: "EQUIP", buy: "BUY", equipped: "EQUIPPED", paused: "PAUSED", resume: "RESUME", quit: "QUIT" }
@@ -169,7 +169,7 @@
             get: function(key) { return LANG[this.current][key]; }
         };
 
-        /* --- VERİ VE KAYIT SİSTEMİ --- */
+        /* --- VERİ VE KAYIT SİSTEMİ (AYNI) --- */
         const PlayerData = {
             carrots: parseInt(localStorage.getItem('bunny_total_carrots')) || 0,
             inventory: JSON.parse(localStorage.getItem('bunny_inventory')) || [0],
@@ -179,7 +179,7 @@
             updateUI: function() { document.getElementById('menu-coins').innerText = this.carrots; document.getElementById('shop-coins').innerText = this.carrots; }
         };
 
-        /* --- MARKET SİSTEMİ --- */
+        /* --- MARKET SİSTEMİ (AYNI) --- */
         const SHOP_ITEMS = [ { id: 0, price: 0, key: 'hat_none' }, { id: 1, price: 500, key: 'hat_party' }, { id: 2, price: 1000, key: 'hat_top' }, { id: 3, price: 2500, key: 'hat_viking' } ];
         const Shop = {
             open: function() { document.getElementById('market-screen').classList.remove('hidden'); this.render(); },
@@ -203,11 +203,11 @@
                     if (PlayerData.carrots >= item.price) { PlayerData.carrots -= item.price; PlayerData.inventory.push(id); PlayerData.equippedHat = id; } else { Game.showPowerUpMsg("❌ Yetersiz Havuç!", "#ff4757"); return; }
                 }
                 PlayerData.save(); this.render();
-                if(Game.socket) Game.socket.emit('updateHat', id); // Sunucuya bildir
+                if(Game.socket) Game.socket.emit('updateHat', id);
             }
         };
 
-        /* --- SES SİSTEMİ --- */
+        /* --- SES SİSTEMİ (AYNI) --- */
         const Sound = {
             ctx: null, enabled: true, musicType: 'menu',
             init: function() { if(this.ctx) return; window.AudioContext = window.AudioContext || window.webkitAudioContext; this.ctx = new AudioContext(); if(localStorage.getItem('bunny_mute') === 'true') { this.enabled = false; document.getElementById('mute-btn').innerText = "🔇"; } },
@@ -332,7 +332,6 @@
                 this.entities = []; this.items = []; this.projectiles = [];
                 this.remoteBunnies = {}; 
 
-                // --- SOCKET BAĞLANTISI ---
                 this.socket = io();
                 this.socket.on('connect', () => {
                     this.socket.emit('joinGame', {
@@ -342,34 +341,21 @@
                     });
                 });
 
-                // Kendi oyuncunu yarat
                 this.player = new Bunny(0, 0, 0xffffff, name, true);
                 this.player.wearHat(PlayerData.equippedHat); 
                 this.entities.push(this.player);
 
-                // --- EVENT LISTENERS ---
+                /* --- SOCKET EVENTS (DÜZELTİLDİ) --- */
                 
-                // 1. OYUN BAŞLANGIÇ VERİLERİ (HAVUÇLAR & OYUNCULAR)
                 this.socket.on('initGame', (data) => {
-                    // Itemleri yükle
                     this.items.forEach(c => this.scene.remove(c));
                     this.items = [];
-                    data.items.forEach(item => {
-                        this.spawnItem(item.type, item.x, item.z, item.id);
-                    });
-                    
-                    // Diğer oyuncuları yükle
-                    Object.keys(data.players).forEach((id) => {
-                        if (id !== this.socket.id) this.updateRemotePlayer(data.players[id]);
-                    });
+                    data.items.forEach(item => { this.spawnItem(item.type, item.x, item.z, item.id); });
+                    Object.keys(data.players).forEach((id) => { if (id !== this.socket.id) this.updateRemotePlayer(data.players[id]); });
                 });
 
-                // 2. YENİ OYUNCU KATILDI
-                this.socket.on('newPlayer', (playerInfo) => {
-                    this.updateRemotePlayer(playerInfo);
-                });
+                this.socket.on('newPlayer', (playerInfo) => { this.updateRemotePlayer(playerInfo); });
 
-                // 3. OYUNCU AYRILDI
                 this.socket.on('playerDisconnected', (id) => {
                     if (this.remoteBunnies[id]) {
                         this.remoteBunnies[id].remove();
@@ -378,7 +364,7 @@
                     }
                 });
 
-                // 4. HAREKET GÜNCELLEMESİ (ZIPLAMA DAHİL)
+                // --- 1. SKOR VE BÜYÜME SENKRONİZASYONU ---
                 this.socket.on('stateUpdate', (players) => {
                     Object.keys(players).forEach((id) => {
                         if (id !== this.socket.id) {
@@ -386,41 +372,76 @@
                                 const p = players[id];
                                 const b = this.remoteBunnies[id];
                                 b.x = p.x; b.z = p.z; b.angle = p.angle;
-                                b.score = p.score;
-                                b.isMoving = p.isMoving; // Zıplama için
+                                b.isMoving = p.isMoving; 
                                 b.mesh.position.set(p.x, 0, p.z);
                                 b.mesh.rotation.y = p.angle;
+                                
+                                // Skoru güncelle ve BÜYÜT
+                                if(b.score !== p.score) {
+                                    b.score = p.score;
+                                    b.grow(0); // Bu fonksiyon scale'i skora göre ayarlar
+                                }
                             } else {
                                 this.updateRemotePlayer(players[id]);
                             }
                         }
                     });
+                    // Liderlik tablosu her güncellemede çalışsın (dinamik)
+                    this.updateLb();
                 });
 
-                // 5. ŞAPKA DEĞİŞİMİ
-                this.socket.on('playerHatChanged', (data) => {
-                    if(this.remoteBunnies[data.id]) {
-                        this.remoteBunnies[data.id].wearHat(data.hat);
-                    }
-                });
+                this.socket.on('playerHatChanged', (data) => { if(this.remoteBunnies[data.id]) this.remoteBunnies[data.id].wearHat(data.hat); });
 
-                // 6. EŞYA SİLİNDİ (BİRİSİ YEDİ)
+                // --- 2. GÖRSEL EFEKTLER VE POWER-UP SENKRONİZASYONU ---
                 this.socket.on('itemRemoved', (data) => {
                     const idx = this.items.findIndex(i => i.userData.id === data.itemId);
+                    let itemPos = {x:0, z:0};
                     if (idx !== -1) {
                         const item = this.items[idx];
+                        itemPos.x = item.position.x; itemPos.z = item.position.z;
                         this.scene.remove(item);
                         this.items.splice(idx, 1);
-                        Sound.pop(); // Herkes ses duysun
+                    }
+
+                    // Yiyen kişiyi bul
+                    let eater = null;
+                    if(data.eaterId === this.socket.id) eater = this.player;
+                    else if(this.remoteBunnies[data.eaterId]) eater = this.remoteBunnies[data.eaterId];
+
+                    if(eater) {
+                        // Havuç Yeme Efekti ve Yazısı
+                        if(data.type === 'carrot') {
+                            Sound.pop();
+                            // Eğer ben yediysem veya ekranımda görünüyorsa yazı çıksın
+                            Game.showFloatingText("+5", itemPos.x, itemPos.z, "#FFA502");
+                            if(eater.isPlayer) document.getElementById('scoreVal').innerText = Math.floor(eater.score + 5); 
+                        } 
+                        // Power-up Efektleri (Remote Oyuncular İçin de Çalışır)
+                        else if (data.type === 'magnet') {
+                             eater.activateMagnet(); 
+                             Game.showPowerUpMsg(eater.isPlayer ? "🧲 MIKNATIS!" : "", "#2ed573"); 
+                             if(eater.isPlayer) Sound.powerup();
+                        }
+                        else if (data.type === 'pepper') {
+                             eater.activateSpeed(); 
+                             Game.showPowerUpMsg(eater.isPlayer ? "🌶️ ACI BİBER!" : "", "#ff4757"); 
+                             if(eater.isPlayer) Sound.powerup();
+                        }
+                        else if (data.type === 'gold') {
+                             eater.invincibleUntil = Date.now() + 5000; 
+                             Game.showPowerUpMsg(eater.isPlayer ? "👻 HAYALET!" : "", "#FFD700"); 
+                             if(eater.isPlayer) Sound.powerup();
+                        }
+                        else if (data.type === 'mushroom') {
+                             eater.confusionUntil = Date.now() + 5000; 
+                             Game.showPowerUpMsg(eater.isPlayer ? "🍄 KAFAM GÜZEL!" : "", "#8e44ad"); 
+                             if(eater.isPlayer) { Sound.bad(); Game.shakeCamera(5); }
+                        }
                     }
                 });
 
-                // 7. YENİ EŞYA ÇIKTI
-                this.socket.on('itemSpawned', (item) => {
-                    this.spawnItem(item.type, item.x, item.z, item.id);
-                });
+                this.socket.on('itemSpawned', (item) => { this.spawnItem(item.type, item.x, item.z, item.id); });
 
-                // 8. ÖLDÜN (GAME OVER)
                 this.socket.on('youDied', (data) => {
                     Sound.stopMusic(); Sound.pop();
                     this.state = 'GAMEOVER';
@@ -431,7 +452,6 @@
                     if(this.player) this.player.remove();
                 });
 
-                // 9. BİRİSİ ÖLDÜRÜLDÜ
                 this.socket.on('playerKilled', (data) => {
                     if (this.remoteBunnies[data.victimId]) {
                         this.remoteBunnies[data.victimId].remove();
@@ -440,7 +460,6 @@
                     }
                 });
                 
-                // 10. UZAKTAN ATEŞ EDİLDİ
                 this.socket.on('remoteShoot', (data) => {
                     const shooter = this.remoteBunnies[data.id];
                     if (shooter) {
@@ -457,6 +476,7 @@
                 const newBunny = new Bunny(data.x, data.z, data.color, data.name, false);
                 newBunny.wearHat(data.hat);
                 newBunny.score = data.score;
+                newBunny.grow(0); // İlk boyutu ayarla
                 this.entities.push(newBunny);
                 this.remoteBunnies[data.id] = newBunny;
             },
@@ -475,7 +495,6 @@
                     const glow = new THREE.Mesh(new THREE.DodecahedronGeometry(1), new THREE.MeshBasicMaterial({color:0xffd700, wireframe:true, transparent:true, opacity:0.5})); glow.rotation.y = Math.random(); grp.add(body); grp.add(glow);
                 }
                 grp.position.set(x, 0, z);
-                // ID'yi kaydettik
                 grp.userData = { type: type, yBase: 0, off: Math.random()*10, active: true, id: id };
                 this.scene.add(grp); this.items.push(grp);
             },
@@ -492,7 +511,10 @@
             },
 
             shakeCamera: function(intensity) { this.shakeIntensity = intensity; },
-            showPowerUpMsg: function(msg, color) { const el = document.getElementById('powerup-msg'); el.innerText = msg; el.style.color = color; el.style.opacity = 1; el.style.transform = "translateX(-50%) scale(1.2)"; setTimeout(() => { el.style.opacity = 0; el.style.transform = "translateX(-50%) scale(1)"; }, 2500); },
+            showPowerUpMsg: function(msg, color) { 
+                if(!msg) return; // Mesaj yoksa gösterme
+                const el = document.getElementById('powerup-msg'); el.innerText = msg; el.style.color = color; el.style.opacity = 1; el.style.transform = "translateX(-50%) scale(1.2)"; setTimeout(() => { el.style.opacity = 0; el.style.transform = "translateX(-50%) scale(1)"; }, 2500); 
+            },
 
             updateStatusUI: function() {
                 if(!this.player) return;
@@ -510,14 +532,9 @@
                 this.entities.forEach(e => e.update(time));
                 this.updateStatusUI(); this.updateHudLabels(); 
 
-                // --- SUNUCUYA HAREKET GÖNDERME ---
                 if(this.player && this.socket && !this.player.removed) {
                     this.socket.emit('playerMove', {
-                        x: this.player.x,
-                        z: this.player.z,
-                        angle: this.player.angle,
-                        score: this.player.score,
-                        isMoving: (Game.input.active) // Hareket ediyor mu?
+                        x: this.player.x, z: this.player.z, angle: this.player.angle, score: this.player.score, isMoving: (Game.input.active)
                     });
                 }
 
@@ -599,7 +616,6 @@
                         });
                     }
 
-                    // EŞYA TOPLAMA (SENKRONİZE EDİLDİ)
                     if(e.isPlayer) {
                         let pickupRange = e.scale + 1.5;
                         if (e.hasMagnet) pickupRange += 10;
@@ -609,27 +625,13 @@
                             if (e.hasMagnet && dist < 15 && item.userData.type === 'carrot') { item.position.x += (e.x - item.position.x) * 0.1; item.position.z += (e.z - item.position.z) * 0.1; }
                             
                             if (dist < pickupRange) {
-                                // Hemen silmek yerine sunucudan talep et
                                 if(Game.socket) Game.socket.emit('requestEatItem', item.userData.id);
-                                
-                                // Geçici olarak gizle (akıcılık için)
                                 item.visible = false; 
-
-                                // Efektleri (ses, yazı) sunucu onayı gelince de yapabiliriz ama
-                                // anlık tepki için burada basitçe yapıyoruz (skor sunucudan gelecek)
-                                const type = item.userData.type; 
-                                
-                                if (type === 'carrot') { /* Skor sunucudan gelecek */ } 
-                                else if (type === 'gold') { e.invincibleUntil = now + 5000; Sound.powerup(); Game.showPowerUpMsg("👻 HAYALET MODU!", "#FFD700"); } 
-                                else if (type === 'magnet') { e.activateMagnet(); Sound.powerup(); Game.showPowerUpMsg("🧲 MIKNATIS!", "#2ed573"); } 
-                                else if (type === 'pepper') { e.activateSpeed(); Sound.powerup(); Game.showPowerUpMsg("🌶️ ACI BİBER!", "#ff4757"); } 
-                                else if (type === 'mushroom') { e.confusionUntil = now + 5000; Sound.bad(); Game.showPowerUpMsg("🍄 KAFAM GÜZEL!", "#8e44ad"); Game.shakeCamera(5); }
                             }
                         }
                     }
                 });
 
-                // OYUNCU ÇARPIŞMALARI (Yeme Mantığı)
                 for (let i = 0; i < this.entities.length; i++) {
                     let a = this.entities[i];
                     if (a.removed) continue;
@@ -640,47 +642,31 @@
                         let dist = Math.hypot(a.x - b.x, a.z - b.z);
                         let eatRange = (a.scale + b.scale) * 0.6;
                         
-                        // SADECE BEN YİYOR MUYUM KONTROL ET
-                        // Eğer ben (a) isem ve b'den büyüksem
                         if (dist < eatRange) {
-                            if(a.isPlayer && a.score > b.score * 1.1) {
-                                this.eat(a, b);
-                            } 
-                            // Eğer ben (b) isem ve a'dan büyüksem
-                            else if (b.isPlayer && b.score > a.score * 1.1) {
-                                this.eat(b, a);
-                            }
+                            if(a.isPlayer && a.score > b.score * 1.1) { this.eat(a, b); } 
+                            else if (b.isPlayer && b.score > a.score * 1.1) { this.eat(b, a); }
                         }
                     }
                 }
-                this.updateLb();
             },
 
             eat: function(winner, loser) {
-                // Sunucuya bildir (hile koruması için sunucu da kontrol edecek)
                 if(winner.isPlayer && Game.socket) {
-                    Game.socket.emit('killPlayer', loser.hudElement.innerText); // İsimden değil ID'den bulmalı ama şimdilik socket ID mantığını entities'e tam gömmedik, düzeltelim:
-                    // En doğrusu: entities içinde socketID tutmak.
-                    // Bu örnekte remoteBunnies objesinden ID'yi bulalım
                     let victimId = null;
                     for(let id in this.remoteBunnies) {
                         if(this.remoteBunnies[id] === loser) victimId = id;
                     }
                     if(victimId) Game.socket.emit('killPlayer', victimId);
                 }
-
                 winner.grow(loser.score * 0.5);
                 if(winner.isPlayer || loser.isPlayer) this.shakeCamera(2);
                 if(winner.isPlayer) { Game.showFloatingText("+" + Math.floor(loser.score/2), loser.x, loser.z, "#FF0000"); Sound.eat(); }
                 if (winner.scale > 50) { winner.scale = 50; winner.mesh.scale.set(50, 50, 50); }
-
-                // Loser'ı hemen silme, sunucudan 'playerKilled' gelince silinecek
-                // Ama görsel olarak gizleyebilirsin
                 loser.mesh.visible = false; 
             },
 
             updateLb: function() {
-                if(Math.random() > 0.05) return;
+                // Skora göre sırala ve listeyi güncelle
                 let sorted = this.entities.filter(e=>!e.removed).sort((a,b)=>b.score-a.score).slice(0,5);
                 let h = ""; sorted.forEach((e,i) => { h += `<li class="${e.isPlayer?'me':''}"><span>#${i+1} ${e.name}</span><span>${Math.floor(e.score)}</span></li>`; });
                 document.getElementById('lbList').innerHTML = h;
@@ -695,7 +681,7 @@
                 this.baseSpeed = 0.3; this.speedMult = 1; this.angle = 0; 
                 this.hasMagnet = false; this.hasSpeed = false;
                 this.confusionUntil = 0; this.invincibleUntil = 0; this.warpCooldown = 0;
-                this.isMoving = false; // Animasyon için
+                this.isMoving = false; 
                 this.mesh = new THREE.Group(); this.mesh.position.set(x, 0, z); Game.scene.add(this.mesh);
                 this.hudElement = Game.createHudLabel(name, isPlayer);
                 this.matNormal = new THREE.MeshStandardMaterial({color: color, roughness: 0.3});
@@ -724,11 +710,7 @@
                 const bullet = { x: this.x + Math.sin(this.angle) * 2, z: this.z + Math.cos(this.angle) * 2, vx: Math.sin(this.angle) * speed, vz: Math.cos(this.angle) * speed, owner: this, life: 60, mesh: new THREE.Mesh(Game.geomCarrot, Game.matRed) };
                 bullet.mesh.rotation.x = Math.PI / 2; bullet.mesh.rotation.z = -this.angle; bullet.mesh.position.set(bullet.x, 2, bullet.z); 
                 Game.scene.add(bullet.mesh); Game.projectiles.push(bullet); 
-                if(this.isPlayer) {
-                    Sound.pop();
-                    // SUNUCUYA BİLDİR
-                    Game.socket.emit('playerShoot', { x: this.x, z: this.z, angle: this.angle });
-                }
+                if(this.isPlayer) { Sound.pop(); Game.socket.emit('playerShoot', { x: this.x, z: this.z, angle: this.angle }); }
             }
             dropTrap() {
                 if(this.score < 20) return; this.score -= 15; this.grow(0);
@@ -743,22 +725,18 @@
                 else if (now < this.confusionUntil) { this.bodyMesh.material = this.matConfused; this.earL.material = this.matConfused; this.earR.material = this.matConfused; } 
                 else { this.bodyMesh.material = this.matNormal; this.earL.material = this.matNormal; this.earR.material = this.matNormal; }
 
-                // --- UZAK OYUNCU İÇİN (ZIPLAMA BURADA) ---
                 if(!this.isPlayer) {
                     this.mesh.scale.setScalar(this.scale);
-                    // Sunucudan isMoving true gelirse zıpla
                     if(this.isMoving) {
                         let hop = Math.abs(Math.sin(time * 15)) * 0.5;
                         this.body.position.y = hop;
                     } else {
-                        // Duruyorsa hafif nefes alma
                         let breath = Math.sin(time * 3) * 0.05;
                         this.body.position.y = breath;
                     }
                     return;
                 }
 
-                // SADECE OYUNCU İÇİN FİZİK VE KONTROL
                 let spd = this.baseSpeed * this.speedMult; this.speedMult = 1; if (this.hasSpeed) spd *= 2.0;
                 let isSprinting = false; if(Game.input.run && this.score > 5) { spd *= 2.5; this.score -= 0.1; this.grow(0); isSprinting = true; }
                 let moveX = 0, moveZ = 0; let targetAngle = this.angle; let isMoving = false;
@@ -784,7 +762,7 @@
             remove() { this.removed = true; Game.scene.remove(this.mesh); if(this.hudElement) this.hudElement.remove(); }
         }
 
-        /* --- INPUT --- */
+        /* --- INPUT (AYNI) --- */
         window.addEventListener('resize', () => { if(Game.camera && Game.renderer) { Game.camera.aspect = window.innerWidth/window.innerHeight; Game.camera.updateProjectionMatrix(); Game.renderer.setSize(window.innerWidth, window.innerHeight); } });
         const jZone = document.getElementById('joystick-area'); const jThumb = document.getElementById('joystick-thumb'); let jRect;
         const handleMove = (cx, cy, x, y) => { let dx = x - cx, dy = y - cy; let dist = Math.min(Math.hypot(dx,dy), 60); Game.input.active = true; Game.input.angle = Math.atan2(dy, dx); jThumb.style.transform = `translate(calc(-50% + ${Math.cos(Game.input.angle)*dist}px), calc(-50% + ${Math.sin(Game.input.angle)*dist}px))`; };
@@ -806,3 +784,4 @@
     </script>
 </body>
 </html>
+
