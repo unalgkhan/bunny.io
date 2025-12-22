@@ -4,49 +4,49 @@ const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const path = require('path');
 
-// Statik dosyaları sun (index.html)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- OYUN SABİTLERİ ---
-const WORLD_SIZE = 800;
-const MAX_ITEMS = 300;
-const SEASON_DURATION = 20000; // 20 saniye
+// --- OYUN AYARLARI ---
+const WORLD_SIZE = 1000; // Harita biraz daha büyük
+const MAX_ITEMS = 400;
+const SEASON_DURATION = 15000; // 15 saniyede bir mevsim değişsin
 
-// --- OYUN DURUMU (STATE) ---
+// --- STATE ---
 let players = {};
 let items = [];
-let projectiles = [];
 let gameState = {
     season: 0, // 0:İlkbahar, 1:Yaz, 2:Sonbahar, 3:Kış
     seasonTimer: Date.now() + SEASON_DURATION
 };
 
-// Başlangıç itemlerini oluştur
-function spawnItem() {
+// Yardımcı: Rastgele ID
+const uid = () => Math.random().toString(36).substr(2, 9);
+
+// İtem Oluşturucu
+function spawnItem(forceType = null) {
     if (items.length >= MAX_ITEMS) return;
-    const types = ['carrot', 'carrot', 'carrot', 'pepper', 'magnet', 'mushroom', 'gold'];
-    const type = types[Math.floor(Math.random() * types.length)];
-    const id = Math.random().toString(36).substr(2, 9);
+    const types = ['carrot', 'carrot', 'carrot', 'carrot', 'pepper', 'magnet', 'mushroom', 'gold'];
+    const type = forceType || types[Math.floor(Math.random() * types.length)];
     
-    // Rastgele pozisyon (Merkezden biraz dağıt)
+    // Harita içinde rastgele konum
     const angle = Math.random() * Math.PI * 2;
     const radius = Math.random() * (WORLD_SIZE / 2 - 20);
     
     items.push({
-        id: id,
+        id: uid(),
         x: Math.cos(angle) * radius,
         z: Math.sin(angle) * radius,
         type: type
     });
 }
 
-for (let i = 0; i < 100; i++) spawnItem();
+// Başlangıç itemleri
+for (let i = 0; i < 200; i++) spawnItem();
 
-// --- SOCKET BAĞLANTISI ---
 io.on('connection', (socket) => {
-    console.log('Yeni oyuncu katıldı:', socket.id);
+    console.log('Oyuncu geldi:', socket.id);
 
-    // Oyuncu oluştur
+    // Yeni oyuncu
     players[socket.id] = {
         id: socket.id,
         x: (Math.random() - 0.5) * 200,
@@ -56,131 +56,145 @@ io.on('connection', (socket) => {
         scale: 1,
         name: "Player",
         hat: 0,
-        color: Math.floor(Math.random()*16777215), // Rastgele renk
-        invincible: 0,
-        speedMult: 1
+        color: Math.floor(Math.random()*16777215),
+        run: false,
+        speedMult: 1,
+        invincibleUntil: 0
     };
 
-    // Giriş verisini al (İsim ve Şapka)
     socket.on('join_game', (data) => {
         if(players[socket.id]) {
-            players[socket.id].name = data.name.substring(0, 12) || "Player";
+            players[socket.id].name = (data.name || "Player").substring(0, 12);
             players[socket.id].hat = data.hat || 0;
+        }
+        // Oyuncuya mevcut durumu hemen bildir
+        socket.emit('init_game', { id: socket.id, season: gameState.season });
+    });
+
+    socket.on('input', (data) => {
+        const p = players[socket.id];
+        if (p) {
+            p.angle = data.angle;
+            p.run = data.run;
         }
     });
 
-    // Hareket verisini al
-    socket.on('input', (data) => {
-        const p = players[socket.id];
-        if (!p) return;
-        
-        p.angle = data.angle;
-        p.isRunning = data.run;
-    });
-
     socket.on('disconnect', () => {
-        console.log('Oyuncu ayrıldı:', socket.id);
         delete players[socket.id];
     });
 });
 
-// --- OYUN DÖNGÜSÜ (SERVER TICK 30 FPS) ---
+// --- OYUN DÖNGÜSÜ (30 FPS) ---
 setInterval(() => {
     const now = Date.now();
 
-    // 1. Mevsim Döngüsü
+    // Mevsim Kontrolü
     if (now > gameState.seasonTimer) {
         gameState.season = (gameState.season + 1) % 4;
         gameState.seasonTimer = now + SEASON_DURATION;
         io.emit('season_change', gameState.season);
     }
 
-    // 2. Oyuncu Fiziği & Mantığı
+    // Fizik ve Mantık
     for (let id in players) {
         let p = players[id];
-        let speed = 0.3 * p.speedMult;
-        
-        // Mevsim Etkileri
-        if (gameState.season === 1) speed *= 1.2; // Yazın hızlı
-        if (gameState.season === 3) speed *= 0.8; // Kışın yavaş (istemcide kayma efekti var)
+        let baseSpeed = 0.4; // Temel hız
 
-        // Koşma Mantığı
-        if (p.isRunning && p.score > 5) {
+        // Hız Çarpanları
+        let speed = baseSpeed * p.speedMult;
+        if (gameState.season === 1) speed *= 1.2; // Yaz bonusu
+        if (gameState.season === 3) speed *= 0.8; // Kış cezası
+
+        // Koşma (Skor harcar)
+        if (p.run && p.score > 5) {
             speed *= 2.0;
-            p.score -= 0.05; // Koşarken skor harca
+            p.score = Math.max(1, p.score - 0.1);
         }
 
         // Hareket
-        if (p.x !== undefined) {
-            p.x += Math.sin(p.angle) * speed * 20; // Basit hareket
-            p.z += Math.cos(p.angle) * speed * 20;
+        p.x += Math.sin(p.angle) * speed * 25; // Delta time simülasyonu
+        p.z += Math.cos(p.angle) * speed * 25;
 
-            // Harita Sınırları
-            const dist = Math.hypot(p.x, p.z);
-            if (dist > WORLD_SIZE / 2) {
-                const ang = Math.atan2(p.z, p.x);
-                p.x = Math.cos(ang) * (WORLD_SIZE / 2);
-                p.z = Math.sin(ang) * (WORLD_SIZE / 2);
-            }
+        // Harita Sınırı
+        const dist = Math.hypot(p.x, p.z);
+        if (dist > WORLD_SIZE / 2) {
+            const ang = Math.atan2(p.z, p.x);
+            p.x = Math.cos(ang) * (WORLD_SIZE / 2);
+            p.z = Math.sin(ang) * (WORLD_SIZE / 2);
         }
 
-        // Boyut Güncelleme
-        let targetScale = 1 + (p.score * 0.008);
-        if (targetScale > 50) targetScale = 50;
-        p.scale = p.scale * 0.9 + targetScale * 0.1;
+        // Scale Hesapla (Yumuşak geçiş istemcide yapılacak, burada ham değer)
+        let targetScale = 1 + (p.score * 0.01);
+        if (targetScale > 40) targetScale = 40;
+        p.scale = targetScale;
 
-        // Item Toplama
+        // İtem Toplama
         for (let i = items.length - 1; i >= 0; i--) {
             let item = items[i];
             let d = Math.hypot(p.x - item.x, p.z - item.z);
-            if (d < p.scale + 2) { // Toplama menzili
+            let pickupRange = p.scale + 4; // Biraz tolerans
+
+            if (d < pickupRange) {
+                // Efekt verisi topla
+                let gain = 0;
+                if (item.type === 'carrot') { p.score += 5; gain = 5; }
+                else if (item.type === 'gold') { p.score += 30; p.invincibleUntil = now + 5000; gain = 30; }
+                else if (item.type === 'pepper') { 
+                    p.speedMult = 2; 
+                    setTimeout(() => { if(players[id]) players[id].speedMult = 1; }, 4000);
+                }
+                
+                // İtemi sil ve yenisini oluştur
+                const collectedId = item.id;
                 items.splice(i, 1);
+                spawnItem();
                 
-                // Ödül
-                if (item.type === 'carrot') p.score += 5;
-                else if (item.type === 'gold') { p.score += 20; p.invincible = now + 5000; }
-                else if (item.type === 'pepper') { p.speedMult = 2; setTimeout(()=>{ if(players[id]) players[id].speedMult=1; }, 5000); }
-                
-                spawnItem(); // Yenisini oluştur
-                io.emit('item_collected', item.id); // İstemcilere silmesini söyle
-                // Yeni item'i hemen göndermiyoruz, periyodik update halleder
+                // Olayı herkese duyur (Ses ve efekt için)
+                io.emit('item_event', { id: collectedId, playerId: p.id, type: item.type, gain: gain });
             }
         }
     }
 
-    // 3. Oyuncu vs Oyuncu Çarpışması
-    const playerIds = Object.keys(players);
-    for (let i = 0; i < playerIds.length; i++) {
-        for (let j = i + 1; j < playerIds.length; j++) {
-            let p1 = players[playerIds[i]];
-            let p2 = players[playerIds[j]];
-            
-            if(p1.invincible > now || p2.invincible > now) continue;
+    // Çarpışma (PvP)
+    const pIds = Object.keys(players);
+    for (let i = 0; i < pIds.length; i++) {
+        for (let j = i + 1; j < pIds.length; j++) {
+            let p1 = players[pIds[i]];
+            let p2 = players[pIds[j]];
 
-            let dist = Math.hypot(p1.x - p2.x, p1.z - p2.z);
-            let minDist = (p1.scale + p2.scale) * 0.6;
+            if (p1.invincibleUntil > now || p2.invincibleUntil > now) continue;
 
-            if (dist < minDist) {
-                // Büyük küçüğü yer (Basit mantık)
+            let d = Math.hypot(p1.x - p2.x, p1.z - p2.z);
+            let minDist = (p1.scale + p2.scale) * 0.8;
+
+            if (d < minDist) {
+                // Büyük olan yer
                 if (p1.score > p2.score * 1.1) {
-                    p1.score += p2.score * 0.5;
-                    io.emit('player_died', { victim: p2.id, killer: p1.id });
-                    delete players[p2.id]; // Oyuncuyu öldür
+                    killPlayer(p1, p2);
                 } else if (p2.score > p1.score * 1.1) {
-                    p2.score += p1.score * 0.5;
-                    io.emit('player_died', { victim: p1.id, killer: p2.id });
-                    delete players[p1.id];
+                    killPlayer(p2, p1);
+                } else {
+                    // Kafa kafaya çarpışma (İtme efekti eklenebilir)
                 }
             }
         }
     }
 
-    // Dünya Durumunu Gönder
-    io.emit('state_update', { players, items });
+    // Durumu Gönder
+    io.emit('update', { players, items });
 
-}, 1000 / 30); // 30 FPS Server Tick
+}, 30); // ~33ms
+
+function killPlayer(killer, victim) {
+    killer.score += victim.score * 0.4;
+    io.emit('kill_event', { killerId: killer.id, victimId: victim.id, x: victim.x, z: victim.z });
+    
+    // Ölen oyuncuyu respawn et (Skoru sıfırla, yerini değiştir)
+    victim.score = 10;
+    victim.x = (Math.random() - 0.5) * 300;
+    victim.z = (Math.random() - 0.5) * 300;
+    victim.invincibleUntil = Date.now() + 3000;
+}
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => {
-    console.log(`Sunucu ${PORT} portunda çalışıyor`);
-});
+http.listen(PORT, () => console.log(`Server running on port ${PORT}`));
