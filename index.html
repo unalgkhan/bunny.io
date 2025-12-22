@@ -3,785 +3,321 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bunny Island: Online</title>
+    <title>Bunny Island: IO Online</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Nunito', sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;900&display=swap');
 
-        /* --- UI KATMANLARI (AYNI KALDI) --- */
+        /* UI STYLES */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
-        .score-board { position: absolute; top: 20px; left: 80px; background: rgba(255, 255, 255, 0.95); padding: 8px 25px; border-radius: 50px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border-left: 8px solid #FF9F43; color: #333; font-weight: 900; font-size: 1.6rem; display: flex; align-items: center; gap: 15px; animation: slideDown 0.5s ease-out; pointer-events: none; }
-        #pause-btn-game { position: absolute; top: 20px; left: 20px; width: 50px; height: 50px; background: white; border-radius: 50%; border: 4px solid #FF9F43; color: #FF9F43; font-size: 1.5rem; display: flex; justify-content: center; align-items: center; cursor: pointer; pointer-events: auto; box-shadow: 0 5px 15px rgba(0,0,0,0.2); z-index: 100; font-weight: 900; }
-        #pause-btn-game:active { transform: scale(0.9); }
-        .leaderboard { position: absolute; top: 20px; right: 20px; background: rgba(255, 255, 255, 0.85); padding: 12px; border-radius: 15px; color: #333; width: 180px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); backdrop-filter: blur(4px); pointer-events: none; }
-        .leaderboard h4 { margin: 0 0 8px 0; color: #FF9F43; font-size: 0.8rem; text-transform: uppercase; border-bottom: 2px solid #eee; padding-bottom: 5px; }
-        .leaderboard ul { list-style: none; padding: 0; margin: 0; font-size: 0.85rem; font-weight: 800; }
-        .leaderboard li { display: flex; justify-content: space-between; margin-bottom: 4px; padding: 4px; border-radius: 8px; }
-        .leaderboard li.me { background: #FF9F43; color: white; transform: scale(1.02); }
-        .hud-label { position: absolute; top: 0; left: 0; background: rgba(0, 0, 0, 0.5); color: white; padding: 3px 10px; border-radius: 12px; font-size: 14px; font-weight: 900; pointer-events: none; transform: translate(-50%, -100%); white-space: nowrap; text-shadow: 0 1px 3px black; z-index: 5; display: none; }
-        .hud-label.me { color: #FFA502; border: 1px solid #FFA502; z-index: 10; background: rgba(0,0,0,0.7); }
-        #powerup-msg { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); font-size: 2.2rem; font-weight: 900; color: #fff; text-shadow: 0 4px 10px rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.3s; pointer-events: none; text-align: center; width: 100%; z-index: 20; }
-        #status-effect { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); padding: 8px 20px; border-radius: 20px; font-weight: bold; color: white; display: none; box-shadow: 0 5px 15px rgba(0,0,0,0.3); z-index: 20; font-size: 0.9rem; }
-        .controls { position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
-        #joystick-area { position: absolute; bottom: 40px; left: 40px; width: 130px; height: 130px; background: rgba(255, 255, 255, 0.25); border: 2px solid rgba(255, 255, 255, 0.5); border-radius: 50%; pointer-events: auto; backdrop-filter: blur(4px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        #joystick-thumb { width: 60px; height: 60px; background: #fff; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-        .action-container { position: absolute; bottom: 40px; right: 40px; width: 180px; height: 180px; pointer-events: none; }
-        .action-btn { position: absolute; width: 65px; height: 65px; border-radius: 50%; border: 3px solid #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 1.6rem; color: white; cursor: pointer; pointer-events: auto; box-shadow: 0 5px 15px rgba(0,0,0,0.3); transition: transform 0.1s; }
-        .action-btn span { font-size: 0.7rem; font-weight: 800; margin-top: -3px; background: rgba(0,0,0,0.5); padding: 1px 4px; border-radius: 4px; }
-        .action-btn:active { transform: scale(0.9); }
-        #shoot-btn { background: #ff6b6b; bottom: 100px; right: 10px; }
-        #trap-btn { background: #8e44ad; bottom: 10px; right: 100px; }
-        #run-btn { position: absolute; bottom: 0; right: 0; width: 100px; height: 100px; background: linear-gradient(135deg, #00c6fb, #005bea); border: 5px solid #fff; border-radius: 50%; pointer-events: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-weight: 900; font-size: 1.3rem; box-shadow: 0 10px 30px rgba(0, 198, 251, 0.5); transition: transform 0.1s, filter 0.1s; }
-        #run-btn span { font-size: 0.7rem; font-weight: 700; opacity: 0.9; }
-        #run-btn:active { transform: scale(0.92); filter: brightness(1.2); }
-        .overlay-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #4facfe, #00f2fe); display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: auto; z-index: 99; text-align: center; transition: opacity 0.5s; }
-        h1 { font-size: 3.5rem; color: #fff; text-shadow: 0 10px 20px rgba(0,0,0,0.15); margin: 0; line-height: 0.9; letter-spacing: -2px; }
-        p.subtitle { color: #e0f7fa; font-size: 1.1rem; margin-top: 10px; font-weight: 700; margin-bottom: 20px; }
-        .top-bar { position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 101; }
-        .icon-btn { width: 50px; height: 50px; background: rgba(255,255,255,0.3); border-radius: 50%; border: 2px solid white; color: white; font-size: 1.5rem; cursor: pointer; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .currency-display { background: rgba(0,0,0,0.3); padding: 10px 20px; border-radius: 30px; color: #FFA502; font-weight: 900; font-size: 1.5rem; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; border: 2px solid rgba(255,255,255,0.2); }
-        .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 340px; }
-        button.main-btn { background: #fff; color: #00c6fb; border: none; padding: 15px; font-size: 1.2rem; border-radius: 20px; font-weight: 900; cursor: pointer; box-shadow: 0 10px 20px rgba(0, 198, 251, 0.3); transition: transform 0.1s; text-transform: uppercase; width: 100%; }
-        button.main-btn:active { transform: scale(0.96); }
-        button.main-btn.disabled { background: #ccc; color: #888; cursor: not-allowed; box-shadow: none; opacity: 0.7; }
-        button.main-btn.play { grid-column: span 2; background: #FFA502; color: white; font-size: 1.8rem; padding: 20px; box-shadow: 0 15px 30px rgba(255, 165, 2, 0.4); }
-        .input-group { margin-bottom: 20px; }
-        input[type="text"] { padding: 15px; border-radius: 15px; border: none; font-family: 'Nunito'; font-weight: 800; font-size: 1.2rem; text-align: center; width: 200px; outline: none; margin-bottom: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); color: #444; }
-        #market-screen { background: rgba(0,0,0,0.85); z-index: 105; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
-        .shop-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; overflow-y: auto; max-height: 60vh; padding: 10px; width: 100%; max-width: 500px; align-self: center; }
-        .shop-item { background: white; border-radius: 15px; padding: 15px; display: flex; flex-direction: column; align-items: center; gap: 10px; border: 4px solid transparent; cursor: pointer; transition: transform 0.1s; }
-        .shop-item.owned { border-color: #2ed573; background: #e0fbe8; }
-        .shop-item.equipped { border-color: #FFA502; box-shadow: 0 0 20px #FFA502; }
-        .shop-item h3 { margin: 0; font-size: 1rem; color: #333; }
-        .shop-item .price { font-weight: 900; color: #FFA502; }
-        .close-btn { position: absolute; top: 20px; right: 20px; background: #ff4757; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; font-weight: bold; cursor: pointer; }
-        #pause-screen { background: rgba(0, 50, 80, 0.85); z-index: 110; backdrop-filter: blur(8px); }
-        #pause-screen h2 { color: white; font-size: 3rem; margin-bottom: 30px; text-transform: uppercase; }
-        .hidden { display: none !important; }
-        @keyframes slideDown { from { transform: translateY(-100px); } to { transform: translateY(0); } }
-        @media screen and (max-height: 500px) and (orientation: landscape) {
-            h1 { font-size: 2rem; margin-bottom: 5px; }
-            p.subtitle { margin-bottom: 5px; font-size: 0.9rem; }
-            .input-group { margin-bottom: 10px; }
-            input[type="text"] { padding: 8px; font-size: 1rem; width: 180px; }
-            .menu-grid { grid-template-columns: repeat(3, 1fr); width: 450px; gap: 10px; }
-            button.main-btn.play { grid-column: span 1; order: 1; font-size: 1.2rem; padding: 12px; }
-            button.main-btn { padding: 12px; font-size: 1rem; }
-            #btn-market { order: 2; }
-            #btn-online { order: 3; }
-            .currency-display { padding: 5px 15px; font-size: 1.1rem; margin-bottom: 10px; }
-            .shop-grid { grid-template-columns: repeat(3, 1fr); max-height: 50vh; }
-            #game-over h1 { font-size: 2rem; margin: 0; }
-            #game-over h2 { font-size: 2rem; margin: 10px 0; }
-        }
+        #season-indicator { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.2); padding: 5px 20px; border-radius: 20px; color: white; font-weight: 900; font-size: 1.2rem; backdrop-filter: blur(4px); border: 2px solid rgba(255,255,255,0.4); }
+        .score-board { position: absolute; top: 20px; left: 20px; background: rgba(255,255,255,0.95); padding: 8px 25px; border-radius: 50px; font-weight: 900; font-size: 1.6rem; color: #333; display: flex; align-items: center; gap: 15px; border-left: 8px solid #FF9F43; }
+        .leaderboard { position: absolute; top: 70px; right: 20px; background: rgba(255,255,255,0.6); padding: 12px; border-radius: 15px; width: 200px; backdrop-filter: blur(4px); }
+        .leaderboard ul { list-style: none; padding: 0; margin: 0; font-size: 0.85rem; font-weight: 800; color: #333; }
+        .leaderboard li { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        
+        /* CONTROLS */
+        .controls { position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        #joystick-area { position: absolute; bottom: 40px; left: 40px; width: 130px; height: 130px; background: rgba(255,255,255,0.25); border-radius: 50%; pointer-events: auto; border: 2px solid rgba(255,255,255,0.5); }
+        #joystick-thumb { width: 60px; height: 60px; background: #fff; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        #run-btn { position: absolute; bottom: 40px; right: 40px; width: 100px; height: 100px; background: linear-gradient(135deg, #00c6fb, #005bea); border-radius: 50%; pointer-events: auto; display: flex; align-items: center; justify-content: center; color: white; font-weight: 900; border: 5px solid white; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+        
+        /* MENU */
+        #menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.4) 80%); display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: auto; z-index: 99; backdrop-filter: blur(5px); }
+        h1 { font-size: 5rem; color: #fff; margin: 0; line-height: 0.85; text-shadow: 0 10px 20px rgba(0,0,0,0.2); transform: rotate(-3deg); }
+        h1 span { color: #FFA502; }
+        input[type="text"] { background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.3); padding: 15px; border-radius: 30px; color: white; font-size: 1.2rem; text-align: center; margin-top: 30px; outline: none; font-weight: bold; }
+        .tap-text { margin-top: 30px; background: white; color: #333; padding: 15px 40px; border-radius: 30px; font-weight: 900; cursor: pointer; font-size: 1.5rem; box-shadow: 0 10px 20px rgba(0,0,0,0.2); transition: transform 0.1s; }
+        .tap-text:active { transform: scale(0.95); }
+        
+        .hud-label { position: absolute; background: rgba(0,0,0,0.4); color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; pointer-events: none; transform: translate(-50%, -100%); margin-top: -10px; display: none; }
+        #status-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 2rem; font-weight: 900; display: none; text-shadow: 0 4px 10px black; pointer-events: none; }
     </style>
+    <!-- Socket.io Library (Otomatik olarak serverdan gelir ama CDN ekliyoruz garanti olsun) -->
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
-    <div class="top-bar">
-        <button id="mute-btn" class="icon-btn" onclick="Sound.toggleMute()">🔊</button>
-        <button id="lang-btn" class="icon-btn" onclick="Lang.toggle()">TR</button>
-    </div>
-
     <div id="ui-layer">
-        <div id="pause-btn-game" onclick="Game.togglePause()">⏸</div>
+        <div id="season-indicator">🌸 YÜKLENİYOR...</div>
         <div class="score-board">🥕 <span id="scoreVal">0</span></div>
-        <div id="status-effect"></div>
-        <div id="powerup-msg"></div>
-        <div class="leaderboard">
-            <h4 id="lbl-legends">ONLINE</h4>
-            <ul id="lbList"></ul>
-        </div>
+        <div class="leaderboard"><h4>LİDER TABLOSU</h4><ul id="lbList"></ul></div>
+        <div id="status-msg"></div>
         <div class="controls">
             <div id="joystick-area"><div id="joystick-thumb"></div></div>
-            <div class="action-container">
-                <div id="trap-btn" class="action-btn">🍄<span>-15</span></div>
-                <div id="shoot-btn" class="action-btn">🚀<span>-10</span></div>
-                <div id="run-btn">KOŞ<span>HIZ</span></div>
-            </div>
+            <div id="run-btn">KOŞ</div>
         </div>
     </div>
 
-    <div id="menu" class="overlay-screen">
-        <h1>BUNNY<br>ISLAND</h1>
-        <p class="subtitle" id="lbl-subtitle">Online • Savaş • Ye</p>
-        <div class="currency-display">🥕 <span id="menu-coins">0</span></div>
-        <div class="input-group">
-            <input type="text" id="pName" placeholder="İsim Gir" maxlength="12" value="Speedy">
-        </div>
-        <div class="menu-grid">
-            <button id="btn-play" class="main-btn play" onclick="Game.start()">OYNA</button>
-            <button id="btn-online" class="main-btn disabled">ONLINE</button>
-            <button id="btn-market" class="main-btn" onclick="Shop.open()" style="background: #9b59b6; color: white;">MARKET</button>
-        </div>
-    </div>
-
-    <div id="market-screen" class="overlay-screen hidden">
-        <button class="close-btn" onclick="Shop.close()">X</button>
-        <h2 style="color:white; margin-top: 40px;" id="lbl-market">MARKET</h2>
-        <div class="currency-display">🥕 <span id="shop-coins">0</span></div>
-        <div class="shop-grid" id="shop-list"></div>
-    </div>
-
-    <div id="pause-screen" class="overlay-screen hidden">
-        <h2 id="lbl-paused">DURAKLATILDI</h2>
-        <div class="menu-grid" style="display:flex; flex-direction:column; width: 250px;">
-            <button id="btn-resume" class="main-btn play" onclick="Game.togglePause()">DEVAM ET</button>
-            <button id="btn-quit" class="main-btn" onclick="location.reload()" style="background: #ff4757; color: white;">ÇIKIŞ</button>
-        </div>
-    </div>
-
-    <div id="game-over" class="overlay-screen hidden" style="background: rgba(10, 10, 20, 0.9);">
-        <h1 style="color: #FF6B6B;" id="lbl-gameover">OYUN BİTTİ</h1>
-        <h2 id="final-score" style="color:white; font-size: 3rem; margin: 20px 0;">0</h2>
-        <p style="color:#aaa; font-size:1.2rem;"><span id="lbl-earned">Kazanılan:</span> <span id="earned-coins" style="color:#FFA502; font-weight:bold;">0</span> 🥕</p>
-        <button id="btn-retry" class="main-btn" onclick="location.reload()" style="color: #FF6B6B; box-shadow: 0 20px 40px rgba(255, 107, 107, 0.3);">TEKRAR</button>
+    <div id="menu">
+        <h1>BUNNY<br><span>ONLINE</span></h1>
+        <input type="text" id="pName" placeholder="İsminiz..." maxlength="12" value="Player">
+        <div class="tap-text" onclick="startGame()">ONLINE OYNA</div>
     </div>
 
     <script>
-        /* --- DİL SİSTEMİ (AYNI) --- */
-        const LANG = {
-            tr: { play: "OYNA", online: "ONLINE", market: "MARKET", subtitle: "Savaş • Hayatta Kal • Ye", legends: "OYUNCULAR", gameover: "OYUN BİTTİ", earned: "Kazanılan:", retry: "TEKRAR", hat_none: "Şapka Yok", hat_party: "Parti Şapkası", hat_top: "Silindir Şapka", hat_viking: "Viking Miğferi", equip: "KUŞAN", buy: "SATIN AL", equipped: "TAKILI", paused: "DURAKLATILDI", resume: "DEVAM ET", quit: "ÇIKIŞ" },
-            en: { play: "PLAY ONLINE", online: "ONLINE", market: "MARKET", subtitle: "Fight • Survive • Eat", legends: "PLAYERS", gameover: "GAME OVER", earned: "Earned:", retry: "RETRY", hat_none: "No Hat", hat_party: "Party Hat", hat_top: "Top Hat", hat_viking: "Viking Helmet", equip: "EQUIP", buy: "BUY", equipped: "EQUIPPED", paused: "PAUSED", resume: "RESUME", quit: "QUIT" }
-        };
-
-        const Lang = {
-            current: localStorage.getItem('bunny_lang') || 'tr',
-            toggle: function() { this.current = this.current === 'tr' ? 'en' : 'tr'; localStorage.setItem('bunny_lang', this.current); this.update(); },
-            update: function() {
-                const t = LANG[this.current];
-                document.getElementById('lang-btn').innerText = this.current.toUpperCase();
-                document.getElementById('btn-play').innerText = t.play;
-                document.getElementById('btn-market').innerText = t.market;
-                document.getElementById('lbl-subtitle').innerText = t.subtitle;
-                document.getElementById('lbl-legends').innerText = t.legends;
-                document.getElementById('lbl-gameover').innerText = t.gameover;
-                document.getElementById('lbl-earned').innerText = t.earned;
-                document.getElementById('btn-retry').innerText = t.retry;
-                document.getElementById('lbl-market').innerText = t.market;
-                document.getElementById('lbl-paused').innerText = t.paused;
-                document.getElementById('btn-resume').innerText = t.resume;
-                document.getElementById('btn-quit').innerText = t.quit;
-                if(!document.getElementById('market-screen').classList.contains('hidden')) Shop.render();
-            },
-            get: function(key) { return LANG[this.current][key]; }
-        };
-
-        /* --- VERİ VE KAYIT SİSTEMİ (AYNI) --- */
-        const PlayerData = {
-            carrots: parseInt(localStorage.getItem('bunny_total_carrots')) || 0,
-            inventory: JSON.parse(localStorage.getItem('bunny_inventory')) || [0],
-            equippedHat: parseInt(localStorage.getItem('bunny_equipped_hat')) || 0,
-            save: function() { localStorage.setItem('bunny_total_carrots', this.carrots); localStorage.setItem('bunny_inventory', JSON.stringify(this.inventory)); localStorage.setItem('bunny_equipped_hat', this.equippedHat); this.updateUI(); },
-            addCarrots: function(amount) { this.carrots += amount; this.save(); },
-            updateUI: function() { document.getElementById('menu-coins').innerText = this.carrots; document.getElementById('shop-coins').innerText = this.carrots; }
-        };
-
-        /* --- MARKET SİSTEMİ (AYNI) --- */
-        const SHOP_ITEMS = [ { id: 0, price: 0, key: 'hat_none' }, { id: 1, price: 500, key: 'hat_party' }, { id: 2, price: 1000, key: 'hat_top' }, { id: 3, price: 2500, key: 'hat_viking' } ];
-        const Shop = {
-            open: function() { document.getElementById('market-screen').classList.remove('hidden'); this.render(); },
-            close: function() { document.getElementById('market-screen').classList.add('hidden'); },
-            render: function() {
-                const list = document.getElementById('shop-list'); list.innerHTML = "";
-                SHOP_ITEMS.forEach(item => {
-                    const owned = PlayerData.inventory.includes(item.id);
-                    const equipped = PlayerData.equippedHat === item.id;
-                    let btnText = equipped ? Lang.get('equipped') : (owned ? Lang.get('equip') : `${Lang.get('buy')} (${item.price})`);
-                    const el = document.createElement('div');
-                    el.className = `shop-item ${owned ? 'owned' : ''} ${equipped ? 'equipped' : ''}`;
-                    el.innerHTML = `<div style="font-size:3rem;">🎩</div><h3>${Lang.get(item.key)}</h3><div class="price">${owned ? '✔' : item.price + ' 🥕'}</div><button class="main-btn" style="padding:10px; font-size:1rem; margin-top:5px; ${equipped?'opacity:0.5':''}">${btnText}</button>`;
-                    el.querySelector('button').addEventListener('click', (e) => { e.stopPropagation(); Shop.action(item.id); });
-                    list.appendChild(el);
-                });
-            },
-            action: function(id) {
-                const item = SHOP_ITEMS.find(x => x.id === id);
-                if (PlayerData.inventory.includes(id)) { PlayerData.equippedHat = id; } else {
-                    if (PlayerData.carrots >= item.price) { PlayerData.carrots -= item.price; PlayerData.inventory.push(id); PlayerData.equippedHat = id; } else { Game.showPowerUpMsg("❌ Yetersiz Havuç!", "#ff4757"); return; }
-                }
-                PlayerData.save(); this.render();
-                if(Game.socket) Game.socket.emit('updateHat', id);
-            }
-        };
-
-        /* --- SES SİSTEMİ (AYNI) --- */
-        const Sound = {
-            ctx: null, enabled: true, musicType: 'menu',
-            init: function() { if(this.ctx) return; window.AudioContext = window.AudioContext || window.webkitAudioContext; this.ctx = new AudioContext(); if(localStorage.getItem('bunny_mute') === 'true') { this.enabled = false; document.getElementById('mute-btn').innerText = "🔇"; } },
-            toggleMute: function() { this.enabled = !this.enabled; document.getElementById('mute-btn').innerText = this.enabled ? "🔊" : "🔇"; localStorage.setItem('bunny_mute', !this.enabled); if(!this.enabled && this.ctx) this.ctx.suspend(); if(this.enabled && this.ctx) this.ctx.resume(); },
-            tone: function(f, type, dur, vol=0.1) { if(!this.ctx || !this.enabled || Game.paused) return; const o = this.ctx.createOscillator(); const g = this.ctx.createGain(); o.type = type; o.frequency.setValueAtTime(f, this.ctx.currentTime); g.gain.setValueAtTime(vol, this.ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur); o.connect(g); g.connect(this.ctx.destination); o.start(); o.stop(this.ctx.currentTime + dur); },
-            eat: function() { this.tone(800 + Math.random()*200, 'triangle', 0.1, 0.1); },
-            pop: function() { this.tone(150, 'square', 0.1, 0.2); this.tone(100, 'sawtooth', 0.2, 0.2); },
-            powerup: function() { this.tone(400, 'sine', 0.1, 0.1); setTimeout(()=>this.tone(600, 'sine', 0.1, 0.1), 100); },
-            bad: function() { this.tone(150, 'sawtooth', 0.5, 0.2); },
-            warp: function() { this.tone(800, 'sine', 0.3, 0.1); },
-            playMusic: function(type) { if(!this.ctx) return; this.musicType = type; if(!this.isPlayingMusic) { this.isPlayingMusic = true; this.nextNoteTime = this.ctx.currentTime; this.scheduler(); } },
-            stopMusic: function() { this.isPlayingMusic = false; },
-            scheduler: function() { if(!this.isPlayingMusic) return; if (Game.paused) { this.nextNoteTime = this.ctx.currentTime + 0.1; setTimeout(()=>this.scheduler(), 100); return; } while (this.nextNoteTime < this.ctx.currentTime + 0.1) { this.playNote(this.nextNoteTime); this.nextNoteTime += (this.musicType === 'menu' ? 0.5 : 0.25); } setTimeout(()=>this.scheduler(), 25); },
-            playNote: function(time) { if(!this.enabled) return; const o = this.ctx.createOscillator(); const g = this.ctx.createGain(); if(this.musicType === 'menu') { o.frequency.value = 220; o.type = 'sine'; g.gain.value = 0.05; } else { o.frequency.value = 150; o.type = 'triangle'; g.gain.value = 0.03; } o.connect(g); g.connect(this.ctx.destination); o.start(time); o.stop(time + 0.1); }
-        };
-
-        /* --- AYARLAR --- */
-        const CONF = {
-            worldSize: 800, carrotCount: 350, powerUpCount: 40,
-            colors: [ {c:0xffffff, n:'Beyaz'}, {c:0x333333, n:'Siyah'}, {c:0xffca28, n:'Altın'}, {c:0xff80ab, n:'Pembe'}, {c:0x40c4ff, n:'Mavi'}, {c:0x8e44ad, n:'Mor'} ]
-        };
-
-        /* --- OYUN MOTORU --- */
+        // --- İSTEMCİ AYARLARI ---
+        let socket;
         const Game = {
-            state: 'MENU', paused: false, socket: null,
             scene: null, camera: null, renderer: null,
-            player: null, entities: [], items: [], teleporters: [], particles: [], floatingTexts: [], projectiles: [],
-            remoteBunnies: {}, 
-            input: { x:0, y:0, active:false, angle:0, run:false },
-            shakeIntensity: 0,
-
-            init: function() {
-                if(this.renderer) return;
-
-                this.scene = new THREE.Scene();
-                this.scene.background = new THREE.Color(0x87CEEB);
-                this.camera = new THREE.PerspectiveCamera(40, window.innerWidth/window.innerHeight, 1, 1000);
-                this.camera.position.set(0, 40, 60);
-                this.renderer = new THREE.WebGLRenderer({antialias: true, powerPreference: "high-performance"});
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-                this.renderer.shadowMap.enabled = true;
-                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-                document.body.appendChild(this.renderer.domElement);
-
-                const hemi = new THREE.HemisphereLight(0xffffff, 0xffeeb1, 0.8);
-                this.scene.add(hemi);
-                const dir = new THREE.DirectionalLight(0xffffff, 0.7);
-                dir.position.set(100, 150, 80); dir.castShadow = true;
-                dir.shadow.mapSize.width = 2048; dir.shadow.mapSize.height = 2048;
-                dir.shadow.camera.left = -200; dir.shadow.camera.right = 200; dir.shadow.camera.top = 200; dir.shadow.camera.bottom = -200;
-                this.scene.add(dir);
-
-                this.matOrange = new THREE.MeshStandardMaterial({color: 0xff9f43});
-                this.matGreen = new THREE.MeshStandardMaterial({color: 0x2ecc71});
-                this.matRed = new THREE.MeshStandardMaterial({color: 0xff4757, emissive: 0x550000});
-                this.matBlue = new THREE.MeshStandardMaterial({color: 0x2ed573, emissive: 0x004400});
-                this.matPurple = new THREE.MeshStandardMaterial({color: 0x9b59b6, emissive: 0x4a235a}); 
-                this.matGold = new THREE.MeshStandardMaterial({color: 0xFFD700, emissive: 0xFFD700, emissiveIntensity: 0.5, metalness: 0.8}); 
-                this.matBlack = new THREE.MeshBasicMaterial({color: 0x000000}); 
-                
-                this.geomCarrot = new THREE.ConeGeometry(0.5, 1.5, 8);
-                this.geomBox = new THREE.BoxGeometry(1.2, 1.2, 1.2);
-                this.geomMushroom = new THREE.DodecahedronGeometry(0.8);
-
-                this.createEnvironment();
-                this.animate();
-            },
-
-            togglePause: function() {
-                if(this.state !== 'PLAYING') return;
-                this.paused = !this.paused;
-                const pauseScreen = document.getElementById('pause-screen');
-                if(this.paused) { pauseScreen.classList.remove('hidden'); document.getElementById('pause-btn-game').innerHTML = "▶"; } 
-                else { pauseScreen.classList.add('hidden'); document.getElementById('pause-btn-game').innerHTML = "⏸"; }
-            },
-
-            createEnvironment: function() {
-                const ground = new THREE.Mesh(new THREE.CylinderGeometry(CONF.worldSize/1.8, CONF.worldSize/1.8, 15, 64), new THREE.MeshStandardMaterial({color: 0xa8e063}));
-                ground.position.y = -7.5; ground.receiveShadow = true; this.scene.add(ground);
-                const sea = new THREE.Mesh(new THREE.CircleGeometry(CONF.worldSize*2.5, 64), new THREE.MeshBasicMaterial({color: 0x4fc3f7}));
-                sea.rotation.x = -Math.PI/2; sea.position.y = -8; this.scene.add(sea);
-                
-                for (let i = 0; i < 10; i++) {
-                    const x = (Math.random() - 0.5) * CONF.worldSize; const z = (Math.random() - 0.5) * CONF.worldSize;
-                    this.createTeleporter(x, 0, z);
-                }
-                for(let i=0; i<60; i++) {
-                    let ang = Math.random()*Math.PI*2; let r = Math.random()*(CONF.worldSize/2 - 15);
-                    let x = Math.cos(ang)*r, z = Math.sin(ang)*r;
-                    if(Math.abs(x) > 70 && Math.abs(z) > 70) continue;
-                    if(Math.random()>0.3) {
-                        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.7,2,6), new THREE.MeshStandardMaterial({color:0x8d6e63})); trunk.position.set(x, 1, z); trunk.castShadow = true;
-                        const top = new THREE.Mesh(new THREE.DodecahedronGeometry(2), new THREE.MeshStandardMaterial({color:0x4caf50})); top.position.set(x, 3.5, z); top.castShadow = true; this.scene.add(trunk); this.scene.add(top);
-                    } else { const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.5), new THREE.MeshStandardMaterial({color:0x9e9e9e})); rock.position.set(x, 0.5, z); rock.castShadow = true; this.scene.add(rock); }
-                }
-            },
-
-            createTeleporter: function(x, y, z) {
-                const mesh = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 0.2, 32), this.matBlack); mesh.position.set(x, 0.1, z);
-                const ring = new THREE.Mesh(new THREE.TorusGeometry(4, 0.3, 8, 32), new THREE.MeshBasicMaterial({color:0x555555})); ring.rotation.x = Math.PI/2; ring.position.set(x, 0.2, z);
-                this.scene.add(mesh); this.scene.add(ring); this.teleporters.push({x:x, z:z});
-            },
-
-            start: function() {
-                Sound.init(); if(Sound.ctx && Sound.ctx.state === 'suspended') Sound.ctx.resume();
-                Sound.stopMusic(); Sound.playMusic('game');
-
-                const name = document.getElementById('pName').value || "Player";
-                document.getElementById('menu').classList.add('hidden');
-                document.getElementById('ui-layer').style.display = 'block';
-                document.querySelector('.top-bar').style.display = 'none';
-                this.paused = false; document.getElementById('pause-screen').classList.add('hidden');
-
-                this.state = 'PLAYING';
-
-                if(this.player) this.player.remove();
-                this.entities.forEach(e => e.remove());
-                this.items.forEach(c => this.scene.remove(c));
-                this.projectiles.forEach(p => this.scene.remove(p.mesh));
-                this.floatingTexts = [];
-                this.entities = []; this.items = []; this.projectiles = [];
-                this.remoteBunnies = {}; 
-
-                this.socket = io();
-                this.socket.on('connect', () => {
-                    this.socket.emit('joinGame', {
-                        name: name,
-                        color: Math.random() * 0xffffff,
-                        hat: PlayerData.equippedHat
-                    });
-                });
-
-                this.player = new Bunny(0, 0, 0xffffff, name, true);
-                this.player.wearHat(PlayerData.equippedHat); 
-                this.entities.push(this.player);
-
-                /* --- SOCKET EVENTS (DÜZELTİLDİ) --- */
-                
-                this.socket.on('initGame', (data) => {
-                    this.items.forEach(c => this.scene.remove(c));
-                    this.items = [];
-                    data.items.forEach(item => { this.spawnItem(item.type, item.x, item.z, item.id); });
-                    Object.keys(data.players).forEach((id) => { if (id !== this.socket.id) this.updateRemotePlayer(data.players[id]); });
-                });
-
-                this.socket.on('newPlayer', (playerInfo) => { this.updateRemotePlayer(playerInfo); });
-
-                this.socket.on('playerDisconnected', (id) => {
-                    if (this.remoteBunnies[id]) {
-                        this.remoteBunnies[id].remove();
-                        delete this.remoteBunnies[id];
-                        this.entities = this.entities.filter(e => e !== this.remoteBunnies[id]);
-                    }
-                });
-
-                // --- 1. SKOR VE BÜYÜME SENKRONİZASYONU ---
-                this.socket.on('stateUpdate', (players) => {
-                    Object.keys(players).forEach((id) => {
-                        if (id !== this.socket.id) {
-                            if(this.remoteBunnies[id]) {
-                                const p = players[id];
-                                const b = this.remoteBunnies[id];
-                                b.x = p.x; b.z = p.z; b.angle = p.angle;
-                                b.isMoving = p.isMoving; 
-                                b.mesh.position.set(p.x, 0, p.z);
-                                b.mesh.rotation.y = p.angle;
-                                
-                                // Skoru güncelle ve BÜYÜT
-                                if(b.score !== p.score) {
-                                    b.score = p.score;
-                                    b.grow(0); // Bu fonksiyon scale'i skora göre ayarlar
-                                }
-                            } else {
-                                this.updateRemotePlayer(players[id]);
-                            }
-                        }
-                    });
-                    // Liderlik tablosu her güncellemede çalışsın (dinamik)
-                    this.updateLb();
-                });
-
-                this.socket.on('playerHatChanged', (data) => { if(this.remoteBunnies[data.id]) this.remoteBunnies[data.id].wearHat(data.hat); });
-
-                // --- 2. GÖRSEL EFEKTLER VE POWER-UP SENKRONİZASYONU ---
-                this.socket.on('itemRemoved', (data) => {
-                    const idx = this.items.findIndex(i => i.userData.id === data.itemId);
-                    let itemPos = {x:0, z:0};
-                    if (idx !== -1) {
-                        const item = this.items[idx];
-                        itemPos.x = item.position.x; itemPos.z = item.position.z;
-                        this.scene.remove(item);
-                        this.items.splice(idx, 1);
-                    }
-
-                    // Yiyen kişiyi bul
-                    let eater = null;
-                    if(data.eaterId === this.socket.id) eater = this.player;
-                    else if(this.remoteBunnies[data.eaterId]) eater = this.remoteBunnies[data.eaterId];
-
-                    if(eater) {
-                        // Havuç Yeme Efekti ve Yazısı
-                        if(data.type === 'carrot') {
-                            Sound.pop();
-                            // Eğer ben yediysem veya ekranımda görünüyorsa yazı çıksın
-                            Game.showFloatingText("+5", itemPos.x, itemPos.z, "#FFA502");
-                            if(eater.isPlayer) document.getElementById('scoreVal').innerText = Math.floor(eater.score + 5); 
-                        } 
-                        // Power-up Efektleri (Remote Oyuncular İçin de Çalışır)
-                        else if (data.type === 'magnet') {
-                             eater.activateMagnet(); 
-                             Game.showPowerUpMsg(eater.isPlayer ? "🧲 MIKNATIS!" : "", "#2ed573"); 
-                             if(eater.isPlayer) Sound.powerup();
-                        }
-                        else if (data.type === 'pepper') {
-                             eater.activateSpeed(); 
-                             Game.showPowerUpMsg(eater.isPlayer ? "🌶️ ACI BİBER!" : "", "#ff4757"); 
-                             if(eater.isPlayer) Sound.powerup();
-                        }
-                        else if (data.type === 'gold') {
-                             eater.invincibleUntil = Date.now() + 5000; 
-                             Game.showPowerUpMsg(eater.isPlayer ? "👻 HAYALET!" : "", "#FFD700"); 
-                             if(eater.isPlayer) Sound.powerup();
-                        }
-                        else if (data.type === 'mushroom') {
-                             eater.confusionUntil = Date.now() + 5000; 
-                             Game.showPowerUpMsg(eater.isPlayer ? "🍄 KAFAM GÜZEL!" : "", "#8e44ad"); 
-                             if(eater.isPlayer) { Sound.bad(); Game.shakeCamera(5); }
-                        }
-                    }
-                });
-
-                this.socket.on('itemSpawned', (item) => { this.spawnItem(item.type, item.x, item.z, item.id); });
-
-                this.socket.on('youDied', (data) => {
-                    Sound.stopMusic(); Sound.pop();
-                    this.state = 'GAMEOVER';
-                    document.getElementById('game-over').classList.remove('hidden');
-                    document.getElementById('ui-layer').style.display = 'none';
-                    document.getElementById('lbl-gameover').innerText = "YENİLDİN!";
-                    document.getElementById('final-score').innerText = Math.floor(data.score);
-                    if(this.player) this.player.remove();
-                });
-
-                this.socket.on('playerKilled', (data) => {
-                    if (this.remoteBunnies[data.victimId]) {
-                        this.remoteBunnies[data.victimId].remove();
-                        delete this.remoteBunnies[data.victimId];
-                        this.entities = this.entities.filter(e => e !== this.remoteBunnies[data.victimId]);
-                    }
-                });
-                
-                this.socket.on('remoteShoot', (data) => {
-                    const shooter = this.remoteBunnies[data.id];
-                    if (shooter) {
-                        const speed = 0.8;
-                        const bullet = { x: data.x + Math.sin(data.angle)*2, z: data.z + Math.cos(data.angle)*2, vx: Math.sin(data.angle)*speed, vz: Math.cos(data.angle)*speed, owner: shooter, life: 60, mesh: new THREE.Mesh(Game.geomCarrot, Game.matRed) };
-                        bullet.mesh.rotation.x = Math.PI / 2; bullet.mesh.rotation.z = -data.angle; bullet.mesh.position.set(bullet.x, 2, bullet.z); 
-                        Game.scene.add(bullet.mesh); Game.projectiles.push(bullet);
-                    }
-                });
-            },
-            
-            updateRemotePlayer: function(data) {
-                if(this.remoteBunnies[data.id]) return; 
-                const newBunny = new Bunny(data.x, data.z, data.color, data.name, false);
-                newBunny.wearHat(data.hat);
-                newBunny.score = data.score;
-                newBunny.grow(0); // İlk boyutu ayarla
-                this.entities.push(newBunny);
-                this.remoteBunnies[data.id] = newBunny;
-            },
-
-            spawnItem: function(type, x, z, id) {
-                const grp = new THREE.Group();
-                let mesh;
-                if (type === 'carrot') {
-                    const body = new THREE.Mesh(this.geomCarrot, this.matOrange); body.rotation.x = Math.PI; body.position.y = 0.75; body.castShadow = true;
-                    const leaf = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.6,5), this.matGreen); leaf.position.y = 1.5; grp.add(body); grp.add(leaf);
-                } else if (type === 'magnet') { mesh = new THREE.Mesh(this.geomBox, this.matBlue); mesh.position.y = 1; mesh.castShadow = true; grp.add(mesh); }
-                else if (type === 'pepper') { mesh = new THREE.Mesh(this.geomBox, this.matRed); mesh.position.y = 1; mesh.castShadow = true; grp.add(mesh); }
-                else if (type === 'mushroom') { mesh = new THREE.Mesh(this.geomMushroom, this.matPurple); mesh.position.y = 1; mesh.castShadow = true; grp.add(mesh); }
-                else if (type === 'gold') {
-                    const body = new THREE.Mesh(this.geomCarrot, this.matGold); body.rotation.x = Math.PI; body.position.y = 0.75; body.castShadow = true;
-                    const glow = new THREE.Mesh(new THREE.DodecahedronGeometry(1), new THREE.MeshBasicMaterial({color:0xffd700, wireframe:true, transparent:true, opacity:0.5})); glow.rotation.y = Math.random(); grp.add(body); grp.add(glow);
-                }
-                grp.position.set(x, 0, z);
-                grp.userData = { type: type, yBase: 0, off: Math.random()*10, active: true, id: id };
-                this.scene.add(grp); this.items.push(grp);
-            },
-
-            createHudLabel: function(text, isPlayer) {
-                const div = document.createElement('div'); div.className = 'hud-label' + (isPlayer ? ' me' : ''); div.textContent = text; document.body.appendChild(div); return div;
-            },
-
-            showFloatingText: function(text, x, z, color) {
-                const div = document.createElement('div'); div.textContent = text;
-                div.style.position = 'absolute'; div.style.color = color; div.style.fontWeight = '900'; div.style.fontSize = '2rem';
-                div.style.textShadow = '0 2px 5px rgba(0,0,0,0.8)'; div.style.pointerEvents = 'none'; div.style.zIndex = 100;
-                document.body.appendChild(div); this.floatingTexts.push({el: div, x: x, y: 3, z: z, life: 1.0});
-            },
-
-            shakeCamera: function(intensity) { this.shakeIntensity = intensity; },
-            showPowerUpMsg: function(msg, color) { 
-                if(!msg) return; // Mesaj yoksa gösterme
-                const el = document.getElementById('powerup-msg'); el.innerText = msg; el.style.color = color; el.style.opacity = 1; el.style.transform = "translateX(-50%) scale(1.2)"; setTimeout(() => { el.style.opacity = 0; el.style.transform = "translateX(-50%) scale(1)"; }, 2500); 
-            },
-
-            updateStatusUI: function() {
-                if(!this.player) return;
-                const el = document.getElementById('status-effect');
-                if(this.player.invincibleUntil > Date.now()) { el.style.display = 'block'; el.style.background = '#FFD700'; el.innerText = "GÖRÜNMEZ: " + Math.ceil((this.player.invincibleUntil - Date.now())/1000) + "s"; } 
-                else if (this.player.confusionUntil > Date.now()) { el.style.display = 'block'; el.style.background = '#8e44ad'; el.innerText = "ZEHİRLENDİN: " + Math.ceil((this.player.confusionUntil - Date.now())/1000) + "s"; } 
-                else { el.style.display = 'none'; }
-            },
-
-            animate: function() {
-                requestAnimationFrame(() => this.animate());
-                if(this.paused) return; if(this.state !== 'PLAYING') return;
-                
-                const time = Date.now() * 0.001;
-                this.entities.forEach(e => e.update(time));
-                this.updateStatusUI(); this.updateHudLabels(); 
-
-                if(this.player && this.socket && !this.player.removed) {
-                    this.socket.emit('playerMove', {
-                        x: this.player.x, z: this.player.z, angle: this.player.angle, score: this.player.score, isMoving: (Game.input.active)
-                    });
-                }
-
-                this.items.forEach(c => { c.rotation.y += 0.03; c.position.y = Math.sin(time*3 + c.userData.off) * 0.4; if(c.userData.type === 'gold') c.children[1].rotation.z -= 0.05; });
-                for(let i = this.particles.length - 1; i >= 0; i--) { let p = this.particles[i]; if(p.update && !p.update()) { this.particles.splice(i, 1); } }
-
-                for(let i = this.projectiles.length - 1; i >= 0; i--) {
-                    let p = this.projectiles[i]; if(!p.isTrap) { p.x += p.vx; p.z += p.vz; p.mesh.position.set(p.x, 2, p.z); p.life--; }
-                    let hit = false;
-                    for(let j = 0; j < this.entities.length; j++) {
-                        let e = this.entities[j]; if(e === p.owner || e.removed) continue; 
-                        let dist = Math.hypot(p.x - e.x, p.z - e.z);
-                        if(dist < e.scale + 1.5) {
-                            hit = true; e.confusionUntil = Date.now() + 3000; e.score = Math.max(10, e.score * 0.8); e.grow(0);
-                            if(e.isPlayer) { Game.shakeCamera(5); Game.showPowerUpMsg("VURULDUN! 😵", "#ff4757"); } else if (p.owner && p.owner.isPlayer) { Game.showFloatingText("İSABET!", e.x, e.z, "#ff4757"); Sound.eat(); } break; 
-                        }
-                    }
-                    if(p.life <= 0 || hit) { Game.scene.remove(p.mesh); this.projectiles.splice(i, 1); }
-                }
-
-                for(let i=this.floatingTexts.length-1; i>=0; i--) {
-                    let ft = this.floatingTexts[i]; ft.life -= 0.02; ft.y += 0.1;
-                    if(this.camera) {
-                        const vec = new THREE.Vector3(ft.x, ft.y, ft.z); vec.project(this.camera);
-                        const x = (vec.x * .5 + .5) * window.innerWidth; const y = (-(vec.y * .5) + .5) * window.innerHeight;
-                        ft.el.style.left = `${x}px`; ft.el.style.top = `${y}px`; ft.el.style.opacity = ft.life; ft.el.style.transform = `translateX(-50%) scale(${ft.life})`;
-                    }
-                    if(ft.life <= 0) { document.body.removeChild(ft.el); this.floatingTexts.splice(i, 1); }
-                }
-                this.checkCollisions();
-                if(this.renderer && this.scene && this.camera) { this.updateCamera(); this.renderer.render(this.scene, this.camera); this.entities = this.entities.filter(e => !e.removed); }
-            },
-
-            updateCamera: function() {
-                if(!this.player || this.player.removed) return;
-                const zoomFactor = this.player.scale; 
-                const isPortrait = window.innerHeight > window.innerWidth;
-                const zAdjust = isPortrait ? 20 : 0; const yAdjust = isPortrait ? 10 : 0;
-                const targetY = 40 + (zoomFactor * 15) + yAdjust; const targetZ = 50 + (zoomFactor * 15) + zAdjust;
-                const targetPos = new THREE.Vector3(this.player.x, targetY, this.player.z + targetZ);
-                if(this.shakeIntensity > 0) {
-                    targetPos.x += (Math.random()-0.5) * this.shakeIntensity;
-                    targetPos.y += (Math.random()-0.5) * this.shakeIntensity;
-                    targetPos.z += (Math.random()-0.5) * this.shakeIntensity;
-                    this.shakeIntensity *= 0.9;
-                }
-                this.camera.position.lerp(targetPos, 0.08); this.camera.lookAt(this.player.x, 0, this.player.z);
-            },
-
-            updateHudLabels: function() {
-                this.entities.forEach(e => {
-                    if(e.removed || !e.hudElement) return;
-                    const yOffset = 2.5 + (e.scale * 0.8);
-                    const pos = e.mesh.position.clone(); pos.y += yOffset; pos.project(this.camera);
-                    if(Math.abs(pos.z) > 1) { e.hudElement.style.display = 'none'; return; }
-                    const x = (pos.x * .5 + .5) * window.innerWidth; const y = (-(pos.y * .5) + .5) * window.innerHeight;
-                    e.hudElement.style.display = 'block'; e.hudElement.style.left = `${x}px`; e.hudElement.style.top = `${y}px`; e.hudElement.style.zIndex = e.isPlayer ? 100 : Math.floor(10 - pos.z * 10);
-                });
-            },
-
-           checkCollisions: function() {
-                const now = Date.now();
-                this.entities.forEach(e => {
-                    if (e.removed) return;
-                    if (e.scale > 50) { e.scale = 50; e.mesh.scale.set(50, 50, 50); }
-
-                    if (now > (e.warpCooldown || 0)) {
-                        this.teleporters.forEach(tp => {
-                            let d = Math.hypot(e.x - tp.x, e.z - tp.z);
-                            if (d < 4) {
-                                const others = this.teleporters.filter(t => t !== tp);
-                                if (others.length > 0) {
-                                    const randTp = others[Math.floor(Math.random() * others.length)];
-                                    e.x = randTp.x + (Math.random() * 6 - 3); e.z = randTp.z + (Math.random() * 6 - 3);
-                                }
-                                e.warpCooldown = now + 3000;
-                                if (e.isPlayer) { Sound.warp(); Game.shakeCamera(5); Game.showFloatingText("IŞINLANDIN!", e.x, e.z, "#ffffff"); }
-                            }
-                        });
-                    }
-
-                    if(e.isPlayer) {
-                        let pickupRange = e.scale + 1.5;
-                        if (e.hasMagnet) pickupRange += 10;
-                        for (let i = this.items.length - 1; i >= 0; i--) {
-                            let item = this.items[i];
-                            let dist = Math.hypot(e.x - item.position.x, e.z - item.position.z);
-                            if (e.hasMagnet && dist < 15 && item.userData.type === 'carrot') { item.position.x += (e.x - item.position.x) * 0.1; item.position.z += (e.z - item.position.z) * 0.1; }
-                            
-                            if (dist < pickupRange) {
-                                if(Game.socket) Game.socket.emit('requestEatItem', item.userData.id);
-                                item.visible = false; 
-                            }
-                        }
-                    }
-                });
-
-                for (let i = 0; i < this.entities.length; i++) {
-                    let a = this.entities[i];
-                    if (a.removed) continue;
-                    for (let j = i + 1; j < this.entities.length; j++) {
-                        let b = this.entities[j];
-                        if (b.removed) continue;
-                        if (now < a.invincibleUntil || now < b.invincibleUntil) continue;
-                        let dist = Math.hypot(a.x - b.x, a.z - b.z);
-                        let eatRange = (a.scale + b.scale) * 0.6;
-                        
-                        if (dist < eatRange) {
-                            if(a.isPlayer && a.score > b.score * 1.1) { this.eat(a, b); } 
-                            else if (b.isPlayer && b.score > a.score * 1.1) { this.eat(b, a); }
-                        }
-                    }
-                }
-            },
-
-            eat: function(winner, loser) {
-                if(winner.isPlayer && Game.socket) {
-                    let victimId = null;
-                    for(let id in this.remoteBunnies) {
-                        if(this.remoteBunnies[id] === loser) victimId = id;
-                    }
-                    if(victimId) Game.socket.emit('killPlayer', victimId);
-                }
-                winner.grow(loser.score * 0.5);
-                if(winner.isPlayer || loser.isPlayer) this.shakeCamera(2);
-                if(winner.isPlayer) { Game.showFloatingText("+" + Math.floor(loser.score/2), loser.x, loser.z, "#FF0000"); Sound.eat(); }
-                if (winner.scale > 50) { winner.scale = 50; winner.mesh.scale.set(50, 50, 50); }
-                loser.mesh.visible = false; 
-            },
-
-            updateLb: function() {
-                // Skora göre sırala ve listeyi güncelle
-                let sorted = this.entities.filter(e=>!e.removed).sort((a,b)=>b.score-a.score).slice(0,5);
-                let h = ""; sorted.forEach((e,i) => { h += `<li class="${e.isPlayer?'me':''}"><span>#${i+1} ${e.name}</span><span>${Math.floor(e.score)}</span></li>`; });
-                document.getElementById('lbList').innerHTML = h;
-            }
+            players: {}, items: [],
+            myId: null,
+            env: {},
+            input: { angle: 0, run: false, active: false },
+            lastInputTime: 0
         };
 
-        /* --- TAVŞAN MODELİ --- */
-        class Bunny {
-            constructor(x, z, color, name, isPlayer) {
-                this.x = x; this.z = z; this.color = color; this.name = name; this.isPlayer = isPlayer;
-                this.score = 10; this.scale = 1; this.removed = false;
-                this.baseSpeed = 0.3; this.speedMult = 1; this.angle = 0; 
-                this.hasMagnet = false; this.hasSpeed = false;
-                this.confusionUntil = 0; this.invincibleUntil = 0; this.warpCooldown = 0;
-                this.isMoving = false; 
-                this.mesh = new THREE.Group(); this.mesh.position.set(x, 0, z); Game.scene.add(this.mesh);
-                this.hudElement = Game.createHudLabel(name, isPlayer);
-                this.matNormal = new THREE.MeshStandardMaterial({color: color, roughness: 0.3});
-                this.matGhost = new THREE.MeshStandardMaterial({color: 0xFFD700, transparent: true, opacity: 0.4});
-                this.matConfused = new THREE.MeshStandardMaterial({color: 0x8e44ad});
-                this.body = new THREE.Group(); this.mesh.add(this.body);
-                const bodyGeo = new THREE.IcosahedronGeometry(1, 2); this.bodyMesh = new THREE.Mesh(bodyGeo, this.matNormal);
-                this.bodyMesh.position.y = 0.9; this.bodyMesh.castShadow = true; this.bodyMesh.scale.set(1.1, 0.9, 1.1); this.body.add(this.bodyMesh);
-                const earGeo = new THREE.CapsuleGeometry(0.25, 1, 4, 8);
-                this.earL = new THREE.Mesh(earGeo, this.matNormal); this.earL.position.set(-0.35, 1.6, 0); this.earL.rotation.z = 0.3; this.earL.rotation.x = -0.2;
-                this.earR = new THREE.Mesh(earGeo, this.matNormal); this.earR.position.set(0.35, 1.6, 0); this.earR.rotation.z = -0.3; this.earR.rotation.x = -0.2;
-                this.body.add(this.earL); this.body.add(this.earR);
-                const tail = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshStandardMaterial({color:0xffffff})); tail.position.set(0, 0.5, -0.9); this.body.add(tail);
-            }
-            wearHat(type) {
-                if(this.currentHat) { this.body.remove(this.currentHat); this.currentHat = null; }
-                if(!type || type === 0) return;
-                let hatMesh; const hatMat = new THREE.MeshStandardMaterial({color: 0x333333}); const hatMatRed = new THREE.MeshStandardMaterial({color: 0xff4757}); 
-                if(type === 1) { hatMesh = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.8, 16), hatMatRed); hatMesh.position.set(0, 2.2, 0); hatMesh.rotation.z = -0.2; }
-                else if(type === 2) { const group = new THREE.Group(); const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.1, 16), hatMat); const top = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.7, 16), hatMat); top.position.y = 0.4; group.add(brim); group.add(top); hatMesh = group; hatMesh.position.set(0, 2.1, 0); hatMesh.rotation.x = -0.2; }
-                else if(type === 3) { const group = new THREE.Group(); const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 16, 0, Math.PI*2, 0, Math.PI/2), new THREE.MeshStandardMaterial({color: 0xbdc3c7})); const hornL = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.6, 8), new THREE.MeshStandardMaterial({color: 0xffffff})); hornL.position.set(-0.5, 0.3, 0); hornL.rotation.z = 0.5; const hornR = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.6, 8), new THREE.MeshStandardMaterial({color: 0xffffff})); hornR.position.set(0.5, 0.3, 0); hornR.rotation.z = -0.5; group.add(helmet); group.add(hornL); group.add(hornR); hatMesh = group; hatMesh.position.set(0, 1.8, 0); }
-                if(hatMesh) { hatMesh.castShadow = true; this.body.add(hatMesh); this.currentHat = hatMesh; }
-            }
-            shoot() {
-                if(this.score < 15) return; this.score -= 10; this.grow(0); const speed = 0.8;
-                const bullet = { x: this.x + Math.sin(this.angle) * 2, z: this.z + Math.cos(this.angle) * 2, vx: Math.sin(this.angle) * speed, vz: Math.cos(this.angle) * speed, owner: this, life: 60, mesh: new THREE.Mesh(Game.geomCarrot, Game.matRed) };
-                bullet.mesh.rotation.x = Math.PI / 2; bullet.mesh.rotation.z = -this.angle; bullet.mesh.position.set(bullet.x, 2, bullet.z); 
-                Game.scene.add(bullet.mesh); Game.projectiles.push(bullet); 
-                if(this.isPlayer) { Sound.pop(); Game.socket.emit('playerShoot', { x: this.x, z: this.z, angle: this.angle }); }
-            }
-            dropTrap() {
-                if(this.score < 20) return; this.score -= 15; this.grow(0);
-                const trap = { x: this.x - Math.sin(this.angle) * 2, z: this.z - Math.cos(this.angle) * 2, owner: this, isTrap: true, life: 1000, mesh: new THREE.Mesh(Game.geomMushroom, Game.matPurple) };
-                trap.mesh.position.set(trap.x, 1, trap.z); Game.scene.add(trap.mesh); Game.projectiles.push(trap); if(this.isPlayer) Sound.bad(); 
-            }
-            activateMagnet() { this.hasMagnet = true; setTimeout(() => { this.hasMagnet = false; }, 5000); }
-            activateSpeed() { this.hasSpeed = true; setTimeout(() => { this.hasSpeed = false; }, 5000); }
-            update(time) {
-                if(this.removed) return; const now = Date.now();
-                if(now < this.invincibleUntil) { this.bodyMesh.material = this.matGhost; this.earL.material = this.matGhost; this.earR.material = this.matGhost; } 
-                else if (now < this.confusionUntil) { this.bodyMesh.material = this.matConfused; this.earL.material = this.matConfused; this.earR.material = this.matConfused; } 
-                else { this.bodyMesh.material = this.matNormal; this.earL.material = this.matNormal; this.earR.material = this.matNormal; }
+        const CONF = { colors: [0xffffff, 0x333333, 0xffca28, 0xff80ab, 0x40c4ff, 0x8e44ad] };
 
-                if(!this.isPlayer) {
-                    this.mesh.scale.setScalar(this.scale);
-                    if(this.isMoving) {
-                        let hop = Math.abs(Math.sin(time * 15)) * 0.5;
-                        this.body.position.y = hop;
-                    } else {
-                        let breath = Math.sin(time * 3) * 0.05;
-                        this.body.position.y = breath;
-                    }
-                    return;
-                }
+        function initThree() {
+            Game.scene = new THREE.Scene();
+            Game.scene.background = new THREE.Color(0x87CEEB);
+            
+            Game.camera = new THREE.PerspectiveCamera(40, window.innerWidth/window.innerHeight, 1, 1000);
+            Game.camera.position.set(0, 150, 150);
+            Game.camera.lookAt(0,0,0);
 
-                let spd = this.baseSpeed * this.speedMult; this.speedMult = 1; if (this.hasSpeed) spd *= 2.0;
-                let isSprinting = false; if(Game.input.run && this.score > 5) { spd *= 2.5; this.score -= 0.1; this.grow(0); isSprinting = true; }
-                let moveX = 0, moveZ = 0; let targetAngle = this.angle; let isMoving = false;
-                if(Game.input.active) {
-                    isMoving = true; let inputAng = Game.input.angle;
-                    if(now < this.confusionUntil) inputAng += Math.PI; targetAngle = -inputAng + Math.PI/2;
-                }
-                let diff = targetAngle - this.angle; while(diff > Math.PI) diff -= Math.PI*2; while(diff < -Math.PI) diff += Math.PI*2;
-                this.angle += diff * 0.15; this.mesh.rotation.y = this.angle;
-                if(isMoving) {
-                    moveX = Math.sin(this.angle); moveZ = Math.cos(this.angle); this.x += moveX * spd; this.z += moveZ * spd;
-                    let d = Math.hypot(this.x, this.z); if(d > CONF.worldSize/2 - 2) { let ang = Math.atan2(this.z, this.x); this.x = Math.cos(ang)*(CONF.worldSize/2-2); this.z = Math.sin(ang)*(CONF.worldSize/2-2); }
-                }
-                this.mesh.position.set(this.x, 0, this.z);
-                let bobSpeed = isSprinting ? 25 : 12; let hop = isMoving ? Math.abs(Math.sin(time * bobSpeed + this.x * 0.1)) : Math.abs(Math.sin(time * 3) * 0.05);
-                if(isMoving) { this.body.position.y = hop * 0.5; if(isSprinting) this.body.rotation.x = 0.5; else this.body.rotation.x = 0; } else { this.body.position.y = 0; this.body.rotation.x = 0; }
-                this.mesh.scale.setScalar(this.scale);
-            }
-            grow(amt) {
-                this.score += amt; const MAX_SCALE = 50; let targetScale = 1 + (this.score * 0.008);
-                if (targetScale > MAX_SCALE) targetScale = MAX_SCALE; this.scale += (targetScale - this.scale) * 0.1;
-            }
-            remove() { this.removed = true; Game.scene.remove(this.mesh); if(this.hudElement) this.hudElement.remove(); }
+            Game.renderer = new THREE.WebGLRenderer({antialias: true});
+            Game.renderer.setSize(window.innerWidth, window.innerHeight);
+            Game.renderer.shadowMap.enabled = true;
+            document.body.appendChild(Game.renderer.domElement);
+
+            const hemi = new THREE.HemisphereLight(0xffffff, 0xffeeb1, 0.8);
+            Game.scene.add(hemi);
+            const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+            dir.position.set(100, 150, 80); dir.castShadow = true;
+            dir.shadow.mapSize.width = 2048; dir.shadow.mapSize.height = 2048;
+            Game.scene.add(dir);
+
+            createEnvironment();
+            animate();
         }
 
-        /* --- INPUT (AYNI) --- */
-        window.addEventListener('resize', () => { if(Game.camera && Game.renderer) { Game.camera.aspect = window.innerWidth/window.innerHeight; Game.camera.updateProjectionMatrix(); Game.renderer.setSize(window.innerWidth, window.innerHeight); } });
-        const jZone = document.getElementById('joystick-area'); const jThumb = document.getElementById('joystick-thumb'); let jRect;
-        const handleMove = (cx, cy, x, y) => { let dx = x - cx, dy = y - cy; let dist = Math.min(Math.hypot(dx,dy), 60); Game.input.active = true; Game.input.angle = Math.atan2(dy, dx); jThumb.style.transform = `translate(calc(-50% + ${Math.cos(Game.input.angle)*dist}px), calc(-50% + ${Math.sin(Game.input.angle)*dist}px))`; };
-        const startTouch = (e) => { e.preventDefault(); jRect = jZone.getBoundingClientRect(); handleMove(jRect.left+jRect.width/2, jRect.top+jRect.height/2, e.touches[0].clientX, e.touches[0].clientY); };
-        const moveTouch = (e) => { e.preventDefault(); if(!Game.input.active) return; handleMove(jRect.left+jRect.width/2, jRect.top+jRect.height/2, e.touches[0].clientX, e.touches[0].clientY); };
-        const endTouch = () => { Game.input.active = false; jThumb.style.transform = `translate(-50%, -50%)`; };
-        jZone.addEventListener('touchstart', startTouch, {passive:false}); jZone.addEventListener('touchmove', moveTouch, {passive:false}); jZone.addEventListener('touchend', endTouch);
-        jZone.addEventListener('mousedown', e => { jRect = jZone.getBoundingClientRect(); handleMove(jRect.left+jRect.width/2, jRect.top+jRect.height/2, e.clientX, e.clientY); });
-        window.addEventListener('mousemove', e => { if(Game.input.active) handleMove(jRect.left+jRect.width/2, jRect.top+jRect.height/2, e.clientX, e.clientY); });
+        function createEnvironment() {
+            const gGeo = new THREE.CylinderGeometry(800/1.8, 800/1.8, 15, 64);
+            Game.env.groundMat = new THREE.MeshStandardMaterial({color: 0xa8e063});
+            const ground = new THREE.Mesh(gGeo, Game.env.groundMat);
+            ground.position.y = -7.5; ground.receiveShadow = true;
+            Game.scene.add(ground);
+
+            const sea = new THREE.Mesh(new THREE.CircleGeometry(2000, 32), new THREE.MeshBasicMaterial({color: 0x4fc3f7}));
+            sea.rotation.x = -Math.PI/2; sea.position.y = -8;
+            Game.scene.add(sea);
+        }
+
+        function startGame() {
+            const name = document.getElementById('pName').value;
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('ui-layer').style.display = 'block';
+
+            // SOCKET BAĞLANTISI BAŞLAT
+            // Not: Render'da otomatik olarak kendi domainine bağlanır
+            try {
+                socket = io(); 
+                
+                socket.on('connect', () => {
+                    Game.myId = socket.id;
+                    socket.emit('join_game', { name: name, hat: 1 });
+                });
+
+                socket.on('state_update', (data) => {
+                    updateGameState(data);
+                });
+
+                socket.on('season_change', (season) => {
+                    updateSeason(season);
+                });
+
+                socket.on('player_died', (data) => {
+                    if (data.victim === Game.myId) {
+                        showStatus("ÖLDÜN!");
+                        setTimeout(() => location.reload(), 3000);
+                    }
+                });
+
+            } catch(e) {
+                alert("Sunucuya bağlanılamadı. Dosyaları sunucuya yüklediğinden emin ol.");
+                console.error(e);
+            }
+        }
+
+        function updateGameState(data) {
+            // 1. Oyuncuları Güncelle
+            const serverPlayers = data.players;
+            
+            // Var olanları güncelle veya yenileri ekle
+            for (let id in serverPlayers) {
+                const pData = serverPlayers[id];
+                
+                if (!Game.players[id]) {
+                    // Yeni oyuncu yarat
+                    const mesh = createBunnyMesh(pData.color);
+                    Game.players[id] = { mesh: mesh, data: pData, label: createLabel(pData.name) };
+                    Game.scene.add(mesh);
+                }
+                
+                // Pozisyon İnterpolasyonu (Basit Lerp)
+                const p = Game.players[id];
+                p.mesh.position.lerp(new THREE.Vector3(pData.x, 0, pData.z), 0.3);
+                p.mesh.rotation.y = pData.angle; // Rotasyon
+                
+                // Scale güncelle
+                const targetScale = pData.scale || 1;
+                p.mesh.scale.setScalar(targetScale);
+
+                // UI Güncelle
+                updateLabelPos(p);
+                if (id === Game.myId) {
+                    document.getElementById('scoreVal').innerText = Math.floor(pData.score);
+                    updateCamera(p.mesh.position, targetScale);
+                }
+            }
+
+            // Çıkanları sil
+            for (let id in Game.players) {
+                if (!serverPlayers[id]) {
+                    Game.scene.remove(Game.players[id].mesh);
+                    if(Game.players[id].label) Game.players[id].label.remove();
+                    delete Game.players[id];
+                }
+            }
+
+            // 2. İtemleri Güncelle
+            // Basitlik için: Server tüm itemleri yollar, biz hepsini yeniden çizeriz (Optimize edilebilir)
+            // (Performans için mevcut itemleri pool yapabilirsin ama şimdilik silip ekleyelim)
+            Game.items.forEach(i => Game.scene.remove(i.mesh));
+            Game.items = [];
+            
+            data.items.forEach(iData => {
+                const mesh = createItemMesh(iData.type);
+                mesh.position.set(iData.x, 0, iData.z);
+                Game.scene.add(mesh);
+                Game.items.push({ id: iData.id, mesh: mesh });
+            });
+
+            // Liderlik Tablosu
+            updateLeaderboard(serverPlayers);
+        }
+
+        // --- YARDIMCI FONKSİYONLAR ---
+        function createBunnyMesh(color) {
+            const group = new THREE.Group();
+            const mat = new THREE.MeshStandardMaterial({color: color});
+            const body = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), mat);
+            body.position.y = 1; 
+            const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 1.5, 4, 8), mat);
+            ear.position.set(0, 2, 0);
+            ear.rotation.z = 0.2;
+            group.add(body); group.add(ear);
+            return group;
+        }
+
+        function createItemMesh(type) {
+            let col = 0xff9f43;
+            if(type==='gold') col=0xffd700;
+            if(type==='pepper') col=0xff4757;
+            const geo = new THREE.ConeGeometry(0.5, 1.5, 8);
+            const mat = new THREE.MeshStandardMaterial({color: col});
+            const m = new THREE.Mesh(geo, mat);
+            m.rotation.x = Math.PI; m.position.y = 0.75;
+            return m;
+        }
+
+        function createLabel(name) {
+            const div = document.createElement('div');
+            div.className = 'hud-label';
+            div.innerText = name;
+            document.body.appendChild(div);
+            return div;
+        }
+
+        function updateLabelPos(p) {
+            if(!p.label) return;
+            const pos = p.mesh.position.clone();
+            pos.y += p.mesh.scale.y * 2.5;
+            pos.project(Game.camera);
+            
+            const x = (pos.x * .5 + .5) * window.innerWidth;
+            const y = (-(pos.y * .5) + .5) * window.innerHeight;
+            
+            p.label.style.display = 'block';
+            p.label.style.left = x + 'px';
+            p.label.style.top = y + 'px';
+        }
+
+        function updateCamera(targetPos, zoom) {
+            const offset = 40 + (zoom * 2);
+            Game.camera.position.lerp(new THREE.Vector3(targetPos.x, offset, targetPos.z + offset), 0.1);
+            Game.camera.lookAt(targetPos);
+        }
+
+        function updateSeason(s) {
+            const names = ["🌸 İLKBAHAR", "☀️ YAZ", "🍂 SONBAHAR", "❄️ KIŞ"];
+            const colors = [0xa8e063, 0xe0d68a, 0xd38e45, 0xffffff];
+            const skies = [0x87CEEB, 0x00BFFF, 0x708090, 0xddeeff];
+            
+            document.getElementById('season-indicator').innerText = names[s];
+            if(Game.env.groundMat) Game.env.groundMat.color.setHex(colors[s]);
+            Game.scene.background.setHex(skies[s]);
+        }
+
+        function showStatus(msg) {
+            const el = document.getElementById('status-msg');
+            el.innerText = msg; el.style.display = 'block';
+        }
+
+        function updateLeaderboard(players) {
+            const list = Object.values(players).sort((a,b) => b.score - a.score).slice(0, 5);
+            const ul = document.getElementById('lbList');
+            ul.innerHTML = "";
+            list.forEach(p => {
+                ul.innerHTML += `<li>${p.name.substring(0,8)}: ${Math.floor(p.score)}</li>`;
+            });
+        }
+
+        // --- INPUT SİSTEMİ ---
+        function sendInput() {
+            if(!socket || !Game.myId) return;
+            // Sunucuya sadece açı ve koşma durumunu yolla
+            socket.emit('input', {
+                angle: Game.input.angle,
+                run: Game.input.run
+            });
+        }
+
+        const jZone = document.getElementById('joystick-area');
+        const handleMove = (cx, cy, x, y) => {
+            let dx = x - cx, dy = y - cy;
+            Game.input.active = true;
+            Game.input.angle = Math.atan2(dy, dx);
+            document.getElementById('joystick-thumb').style.transform = `translate(calc(-50% + ${Math.cos(Game.input.angle)*40}px), calc(-50% + ${Math.sin(Game.input.angle)*40}px))`;
+        };
+        const endTouch = () => { Game.input.active = false; document.getElementById('joystick-thumb').style.transform = `translate(-50%, -50%)`; };
+        
+        jZone.addEventListener('touchstart', e => { e.preventDefault(); let r=jZone.getBoundingClientRect(); handleMove(r.left+r.width/2, r.top+r.height/2, e.touches[0].clientX, e.touches[0].clientY); });
+        jZone.addEventListener('touchmove', e => { e.preventDefault(); let r=jZone.getBoundingClientRect(); handleMove(r.left+r.width/2, r.top+r.height/2, e.touches[0].clientX, e.touches[0].clientY); });
+        jZone.addEventListener('touchend', endTouch);
+        
+        // Mouse desteği (test için)
+        jZone.addEventListener('mousedown', e => { let r=jZone.getBoundingClientRect(); handleMove(r.left+r.width/2, r.top+r.height/2, e.clientX, e.clientY); });
+        window.addEventListener('mousemove', e => { if(Game.input.active) { let r=jZone.getBoundingClientRect(); handleMove(r.left+r.width/2, r.top+r.height/2, e.clientX, e.clientY); } });
         window.addEventListener('mouseup', endTouch);
+
         const rBtn = document.getElementById('run-btn');
-        const runStart = (e) => { e.preventDefault(); Game.input.run = true; }; const runEnd = (e) => { e.preventDefault(); Game.input.run = false; };
-        rBtn.addEventListener('touchstart', runStart, {passive:false}); rBtn.addEventListener('touchend', runEnd); rBtn.addEventListener('mousedown', runStart); rBtn.addEventListener('mouseup', runEnd);
-        const shootBtn = document.getElementById('shoot-btn'); shootBtn.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); if(Game.player) Game.player.shoot(); }); shootBtn.addEventListener('mousedown', (e) => { e.stopPropagation(); if(Game.player) Game.player.shoot(); });
-        const trapBtn = document.getElementById('trap-btn'); trapBtn.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); if(Game.player) Game.player.dropTrap(); }); trapBtn.addEventListener('mousedown', (e) => { e.stopPropagation(); if(Game.player) Game.player.dropTrap(); });
-        window.addEventListener('keydown', (e) => { if(!Game.player) return; if(e.code === 'KeyE') Game.player.shoot(); if(e.code === 'KeyQ') Game.player.dropTrap(); if(e.code === 'Space') Game.input.run = true; if(e.code === 'Escape') Game.togglePause(); });
-        window.addEventListener('keyup', (e) => { if(e.code === 'Space') Game.input.run = false; });
-        window.onload = function() { if(typeof THREE !== 'undefined') { PlayerData.updateUI(); Lang.update(); Game.init(); } };
+        rBtn.addEventListener('touchstart', (e)=>{e.preventDefault(); Game.input.run=true;});
+        rBtn.addEventListener('touchend', (e)=>{e.preventDefault(); Game.input.run=false;});
+        rBtn.addEventListener('mousedown', ()=>{Game.input.run=true;});
+        rBtn.addEventListener('mouseup', ()=>{Game.input.run=false;});
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if(Game.input.active || Game.input.run) sendInput();
+            Game.renderer.render(Game.scene, Game.camera);
+        }
+
+        window.onload = initThree;
+
     </script>
 </body>
 </html>
-
